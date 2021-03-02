@@ -26,10 +26,6 @@ DIM = '\033[2m'
 def get_defaults():
     default_dict = {"threads":1,
                     "config":False,
-                    "data_column":"sequence_name",
-                    "output_prefix":"global_report",
-                    "summary_fields":"node_number,most_recent_tip,tip_count,admin0_count,admin1_count",
-                    "cluster_fields":"node_number,day_range,tip_count,uk_tip_count,uk_chain_count,identical_count",
                     "no_temp":False,
                     "force":True
                     }

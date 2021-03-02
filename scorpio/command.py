@@ -39,7 +39,6 @@ def main(sysargs = sys.argv[1:]):
     misc_group.add_argument('--tempdir',action="store",help="Specify where you want the temporary stuff to go Default: $TMPDIR")
     misc_group.add_argument("--no-temp",action="store_true",help="Output all intermediate files")
     misc_group.add_argument("--verbose",action="store_true",help="Print lots of stuff to screen")
-    misc_group.add_argument("--no-force",action="store_true",help="Dont force run rules",dest="no_force")
     misc_group.add_argument('-t','--threads', action='store',dest="threads",type=int,help="Number of threads")
     misc_group.add_argument("-v","--version", action='version', version=f"scorpio {__version__}")
     
