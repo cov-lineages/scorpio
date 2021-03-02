@@ -1,0 +1,19 @@
+name: scorpio
+channels:
+  - anaconda
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - wget
+  - biopython=1.74
+  - minimap2
+  - pip=19.3.1
+  - python=3.7
+  - snakemake-minimal=5.13
+  - libpysal=4.3.0
+  - gofasta
+  - pip:
+    - git+https://github.com/cov-ert/reportfunk.git
+    - git+https://github.com/cov-ert/fastafunk.git
+    - git+https://github.com/cov-ert/datafunk.git
