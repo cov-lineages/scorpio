@@ -34,8 +34,8 @@ setup(name='scorpio',
 
       description='serious constellations of reoccurring phylogenetically-independent origin',
       url='https://github.com/cov-lineages/scorpio',
-      author='Rambaut Group',
-      author_email='aine.otoole@ed.ac.uk',
+      author='Ben Jackson & Rambaut Group',
+      author_email='bjackso4@ed.ac.uk',
       entry_points="""
       [console_scripts]
       {program} = scorpio.command:main
