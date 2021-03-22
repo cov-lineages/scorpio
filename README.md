@@ -40,3 +40,7 @@ The JSON file for an individual constellation (in this case a lineage defining o
 	]
 }
 ```
+
+The general format of a mutation code is:
+`gene`:[`ref`]`coordinates`[`alt`]
+where `gene` is a gene code (or `nuc` for the genomic nucleotide sequence), `ref` is the nucleotide or amino acids in the reference, `alt` is the specific nucleotide or amino acid for the mutatant. Either of `ref` or `alt` can be missing if no specific state is required.
