@@ -7,7 +7,7 @@ serious constellations of reoccurring phylogenetically-independent origin
 2. `haplotype` - takes a set of constellations and writes haplotypes (either as strings or individual columns).
 3. `report` - creates a report HTML for a constellation
 
-The JSON file for an individual constellation would look like this:
+The JSON file for an individual constellation (in this case a lineage defining one) would look like this:
 ```json
 {
 	"name": "B.1.1.7",
