@@ -3,9 +3,18 @@ serious constellations of reoccurring phylogenetically-independent origin
 
 ## Command line options:
 
+### commands
 1. `classify` - takes a set of lineage-defining constellations with rules and classifies sequences by them.
 2. `haplotype` - takes a set of constellations and writes haplotypes (either as strings or individual columns).
 3. `report` - creates a report HTML for a constellation
+
+### general options
+* `-i`, `--input` - primary input file (usually the FASTA file)
+* `-m`, `--metadata` - the metadata CSV file (required for some commands)
+* `-o`, `--output` - the output file or path
+* `-p`, `--prefix` - the output prefix (when multiple output files are being produced)
+* `-c`, `--constellation` - a file of one or more constellations in JSON format (default to installed file from constellation github?)
+* `-n`, `--names` - a list of constellation names to include from the file
 
 The JSON file for an individual constellation (in this case a lineage defining one) would look like this:
 ```json
