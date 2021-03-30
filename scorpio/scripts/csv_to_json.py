@@ -6,9 +6,8 @@ import argparse
 def parse_args():
     parser = argparse.ArgumentParser(description='Generate constellation barcode from variant calls.')
 
-    parser.add_argument("--variant-ref", action="store", type=str, dest="ref_csv")
-    parser.add_argument("--variant-calls", action="store", type=str, dest="calls_csv")
-    parser.add_argument("--out-file", action="store", type=str, dest="out_file")
+    parser.add_argument("--in-csv", action="store", type=str, dest="in_csv")
+    parser.add_argument("--out-json", action="store", type=str, dest="out_json")
 
     return parser.parse_args()
 

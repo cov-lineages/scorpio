@@ -1,0 +1,7 @@
+.eggs/
+.idea/
+build/
+dist/
+scorpio.egg-info/
+scorpio/__pycache__/
+scorpio/*/__pycache__
