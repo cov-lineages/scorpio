@@ -35,7 +35,7 @@ setup(name='scorpio',
       author_email='bjackso4@ed.ac.uk',
       entry_points="""
       [console_scripts]
-      {program} = scorpio.command:main
+      {program} = scorpio.__main__:main
       """.format(program = _program),
       include_package_data=True,
       keywords=[],

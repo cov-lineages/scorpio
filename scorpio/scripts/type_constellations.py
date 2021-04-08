@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import csv
 from Bio import SeqIO
@@ -305,7 +305,7 @@ def generate_barcode(record_seq, variant_list, ref_char=None):
     return ''.join(barcode_list), counts
 
 
-def type_constellations(in_fasta, list_constellation_files, out_csv, reference_json, ref_char=None,
+def type_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json, ref_char=None,
                         output_counts=False):
     reference_seq, features_dict = load_feature_coordinates(reference_json)
     constellation_dict = {}
@@ -318,13 +318,19 @@ def type_constellations(in_fasta, list_constellation_files, out_csv, reference_j
             constellation_dict[constellation] = variants
         else:
             print("%s is not a valid constellation file" % constellation_file)
+
+    if constellation_names:
+        del_keys = [k for k in constellation_dict if k not in constellation_names]
+        for key in del_keys:
+            del constellation_dict[key]
+
     variants_out = open(out_csv, "w")
     variants_out.write("query,%s\n" % ",".join(list(constellation_dict.keys())))
 
     counts_out = {}
     if output_counts:
         for constellation in constellation_dict:
-            counts_out[constellation] = open("%s.counts.csv" % out_csv.replace(".csv", ""))
+            counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation))
             counts_out[constellation].write("query,ref_count,alt_count,other_count,fraction_alt\n")
 
     with open(in_fasta, "r") as f:
@@ -384,7 +390,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    type_constellations(args.in_fasta, args.variants_in, args.variants_out, args.reference_json, ref_char='-')
+    type_constellations(args.in_fasta, args.variants_in, None, args.variants_out, args.reference_json, ref_char='-')
 
 
 if __name__ == '__main__':
