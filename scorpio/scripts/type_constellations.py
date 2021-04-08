@@ -183,7 +183,99 @@ def variant_to_variant_record(l, refseq, features_dict):
     return info
 
 
-def parse_variants_in(refseq, features_dict, variants_file):
+def parse_name_from_file(constellation_file):
+    name = constellation_file.split('/')[-1]
+    name = name.replace(".json", "").replace(".csv", "").replace(".txt", "")
+    return name
+
+
+def set_rules(variants, min_alt, max_ref):
+    if min_alt is None:
+        min_alt = len([v for v in variants if v["type"] != "ins"])
+    if max_ref is None:
+        max_ref = 1
+    return min_alt, max_ref
+
+
+def parse_json_in(refseq, features_dict, variants_file):
+    """
+    returns variant_list name and rules
+    """
+    variant_list = []
+    print("Parsing constellation file %s" % variants_file)
+
+    in_json = open(variants_file, 'r')
+    json_dict = json.load(in_json, strict=False)
+    if "sites" in json_dict:
+        for site in json_dict["sites"]:
+            record = variant_to_variant_record(site, refseq, features_dict)
+            if record != {}:
+                variant_list.append(record)
+
+    if "name" in json_dict:
+        name = json_dict["name"]
+    else:
+        name = parse_name_from_file(variants_file)
+
+    min_alt = None
+    max_ref = None
+    if "min_alt" in json_dict:
+        min_alt = json_dict["min_alt"]
+    if "max_ref" in json_dict:
+        max_ref = json_dict["max_ref"]
+
+    in_json.close()
+
+    return variant_list, name, min_alt, max_ref
+
+
+def parse_csv_in(refseq, features_dict, variants_file):
+    """
+    returns variant_list and name
+    """
+    variant_list = []
+    print("Parsing constellation file %s" % variants_file)
+
+    name = parse_name_from_file(variants_file)
+
+    with open("%s" % variants_file, 'r') as csv_in:
+        reader = csv.DictReader(csv_in)
+        for row in reader:
+            if "id" in reader.fieldnames:
+                if ":" not in row["id"] and "gene" in reader.fieldnames:
+                    var = "%s:%s" % (row["gene"], row["id"])
+                else:
+                    var = row["id"]
+                record = variant_to_variant_record(var, refseq, features_dict)
+                if record != {}:
+                    variant_list.append(record)
+            else:
+                break
+
+    return variant_list, name
+
+
+def parse_textfile_in(refseq, features_dict, variants_file):
+    """
+    returns variant_list and name
+    """
+    variant_list = []
+    print("Parsing constellation file %s" % variants_file)
+
+    name = parse_name_from_file(variants_file)
+
+    with open("%s" % variants_file, "r") as f:
+        for line in f:
+            l = line.split("#")[0].strip()  # remove comments from the line
+            if len(l) > 0:  # skip blank lines (or comment only lines)
+                record = variant_to_variant_record(l, refseq, features_dict)
+                if record != {}:
+                    variant_list.append(record)
+
+    return variant_list, name
+
+
+def parse_variants_in(refseq, features_dict, variants_file, rule_dict = None):
     """
     read in a variants file and parse its contents and
     return something sensible.
@@ -202,40 +294,20 @@ def parse_variants_in(refseq, features_dict, variants_file):
     one dict per variant. format of subdict varies by variant type
     """
     variant_list = []
-    print("Parsing constellation file %s" % variants_file)
-
+    min_alt, max_ref = None, None
     if variants_file.endswith(".json"):
-        in_json = open(variants_file, 'r')
-        json_dict = json.load(in_json, strict=False)
-        if "sites" in json_dict:
-            for site in json_dict["sites"]:
-                record = variant_to_variant_record(site, refseq, features_dict)
-                if record != {}:
-                    variant_list.append(record)
+        variant_list, name, min_alt, max_ref = parse_json_in(refseq, features_dict, variants_file)
     elif variants_file.endswith(".csv"):
-        with open("%s" % variants_file, 'r') as csv_in:
-            reader = csv.DictReader(csv_in)
-            for row in reader:
-                if "id" in reader.fieldnames:
-                    if ":" not in row["id"] and "gene" in reader.fieldnames:
-                        var = "%s:%s" % (row["gene"], row["id"])
-                    else:
-                        var = row["id"]
-                    record = variant_to_variant_record(var, refseq, features_dict)
-                    if record != {}:
-                        variant_list.append(record)
-                else:
-                    break
-    if len(variant_list) == 0 and not variants_file.endswith(".json"):
-        with open("%s" % variants_file, "r") as f:
-            for line in f:
-                l = line.split("#")[0].strip()  # remove comments from the line
-                if len(l) > 0:  # skip blank lines (or comment only lines)
-                    record = variant_to_variant_record(l, refseq, features_dict)
-                    if record != {}:
-                        variant_list.append(record)
+        variant_list, name = parse_csv_in(refseq, features_dict, variants_file)
 
-    return variant_list
+    if len(variant_list) == 0 and not variants_file.endswith(".json"):
+        variants_list, name = parse_textfile_in(refseq, features_dict, variants_file)
+
+    if rule_dict is not None:
+        min_alt, max_ref = set_rules(variant_list, min_alt, max_ref)
+        rule_dict[name] = {"min_alt": min_alt, "max_ref": max_ref}
+
+    return name, variant_list, rule_dict
 
 
 def call_variant(record_seq, var):
@@ -289,6 +361,20 @@ def call_variant(record_seq, var):
     return call, query_allele
 
 
+def count_and_classify(record_seq, variant_list, rules):
+    counts = {'ref': 0, 'alt': 0, 'oth': 0}
+
+    for var in variant_list:
+        call, query_allele = call_variant(record_seq, var)
+        # print(var, call, query_allele)
+        counts[call] += 1
+
+    if counts['alt'] > rules["min_alt"] and counts['ref'] < rules["max_ref"]:
+        return counts, True
+    else:
+        return counts, False
+
+
 def generate_barcode(record_seq, variant_list, ref_char=None):
     barcode_list = []
     counts = {'ref': 0, 'alt': 0, 'oth': 0}
@@ -308,21 +394,17 @@ def generate_barcode(record_seq, variant_list, ref_char=None):
 def type_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json, ref_char=None,
                         output_counts=False):
     reference_seq, features_dict = load_feature_coordinates(reference_json)
+
     constellation_dict = {}
     for constellation_file in list_constellation_files:
-        constellation = constellation_file.split('/')[-1]
-        constellation = constellation.replace(".json", "").replace(".csv", "").replace(".txt", "")
-        variants = parse_variants_in(reference_seq, features_dict, constellation_file)
+        constellation, variants, ignore = parse_variants_in(reference_seq, features_dict, constellation_file)
+        if constellation_names and constellation not in constellation_names:
+            continue
         print("Found file %s for constellation %s containing variants %s" % (constellation_file, constellation, ",".join([v["name"] for v in variants])))
         if len(variants) > 0:
             constellation_dict[constellation] = variants
         else:
             print("%s is not a valid constellation file" % constellation_file)
-
-    if constellation_names:
-        del_keys = [k for k in constellation_dict if k not in constellation_names]
-        for key in del_keys:
-            del constellation_dict[key]
 
     variants_out = open(out_csv, "w")
     variants_out.write("query,%s\n" % ",".join(list(constellation_dict.keys())))
@@ -330,7 +412,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
     counts_out = {}
     if output_counts:
         for constellation in constellation_dict:
-            counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation))
+            counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation), "w")
             counts_out[constellation].write("query,ref_count,alt_count,other_count,fraction_alt\n")
 
     with open(in_fasta, "r") as f:
@@ -344,12 +426,65 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
             for constellation in constellation_dict:
                 barcode, counts = generate_barcode(record.seq, constellation_dict[constellation], ref_char)
                 if output_counts:
-                    out_info = [record.id, counts['ref'], counts['alt'], counts['oth'],
-                                str(round(counts['alt'] / (counts['alt'] + counts['ref'] + counts['oth']), 4))]
-                    counts_out[constellation].write("%s\n" % ",".join(out_info))
+                    counts_out[constellation].write("%s,%i,%i,%i,%s\n" % (record.id, counts['ref'], counts['alt'], counts['oth'],
+                                str(round(counts['alt'] / (counts['alt'] + counts['ref'] + counts['oth']), 4))))
                 out_list.append(barcode)
 
             variants_out.write("%s\n" % ",".join(out_list))
+
+    variants_out.close()
+    for constellation in counts_out:
+        if counts_out[constellation]:
+            counts_out[constellation].close()
+
+
+def classify_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json,
+                            output_counts=False):
+
+    reference_seq, features_dict = load_feature_coordinates(reference_json)
+
+    constellation_dict = {}
+    rule_dict = {}
+    for constellation_file in list_constellation_files:
+        constellation, variants, rule_dict = parse_variants_in(reference_seq, features_dict, constellation_file, rule_dict)
+        if constellation_names and constellation not in constellation_names:
+            continue
+        print("Found file %s for constellation %s containing variants %s" % (constellation_file, constellation, ",".join([v["name"] for v in variants])))
+        print("Rule dict", rule_dict)
+
+        if len(variants) > 0:
+            constellation_dict[constellation] = variants
+        else:
+            print("%s is not a valid constellation file" % constellation_file)
+
+    variants_out = open(out_csv, "w")
+    variants_out.write("query,lineage\n")
+
+    counts_out = {}
+    if output_counts:
+        for constellation in constellation_dict:
+            counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation), "w")
+            counts_out[constellation].write("query,ref_count,alt_count,other_count,fraction_alt,call\n")
+
+    with open(in_fasta, "r") as f:
+        for record in SeqIO.parse(f, "fasta"):
+            if len(record.seq) != len(reference_seq):
+                sys.stderr.write("The fasta record for %s isn't as long as the reference, is this fasta file aligned?\n"
+                                 % record.id)
+                sys.exit(1)
+
+            lineages = []
+            for constellation in constellation_dict:
+                counts, call = count_and_classify(record.seq, constellation_dict[constellation], rule_dict[constellation])
+                if call:
+                    lineages.append(constellation)
+                if output_counts:
+                    counts_out[constellation].write(
+                        "%s,%i,%i,%i,%s\n" % (record.id, counts['ref'], counts['alt'], counts['oth'],
+                                              str(round(counts['alt'] / (counts['alt'] + counts['ref'] + counts['oth']),
+                                                        4))))
+
+            variants_out.write("%s,%s\n" % (record.id, " ".join(lineages)))
 
     variants_out.close()
     for constellation in counts_out:

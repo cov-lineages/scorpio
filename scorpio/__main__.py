@@ -53,7 +53,16 @@ def main(sysargs = sys.argv[1:]):
         parents=[common],
         help="Takes a set of lineage-defining constellations with rules and classifies sequences by them"
     )
-    subparser_classify.set_defaults(func=scorpio.subcommands.haplotype.run)
+    subparser_classify.add_argument(
+        '--reference-json', help='JSON file containing keys "genome" with reference sequence '
+                                 'and "proteins", "features" or "genes" with features of interest'
+                                 ' and their coordinates'
+    )
+    subparser_classify.add_argument(
+        "--output-counts", dest="output_counts", action="store_true",
+        help="Save a file per constellation of ref, alt and other counts"
+    )
+    subparser_classify.set_defaults(func=scorpio.subcommands.classify.run)
 
     # _______________________________  haplotype  __________________________________#
 
@@ -70,6 +79,10 @@ def main(sysargs = sys.argv[1:]):
     subparser_haplotype.add_argument(
         "--ref-char", dest="ref_char", default='-', required=False,
         help="Symbol to use to represent reference allele"
+    )
+    subparser_haplotype.add_argument(
+        "--output-counts", dest="output_counts", action="store_true",
+        help="Save a file per constellation of ref, alt and other counts"
     )
     subparser_haplotype.set_defaults(func=scorpio.subcommands.haplotype.run)
 
