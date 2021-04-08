@@ -190,10 +190,13 @@ def parse_name_from_file(constellation_file):
 
 
 def set_rules(variants, min_alt, max_ref):
-    if min_alt is None:
+    if min_alt is None and max_ref is None:
         min_alt = len([v for v in variants if v["type"] != "ins"])
-    if max_ref is None:
         max_ref = 1
+    elif max_ref is None:
+        max_ref = len([v for v in variants if v["type"] != "ins"]) - min_alt
+    elif min_alt is None:
+        min_alt = len([v for v in variants if v["type"] != "ins"]) - max_ref
     return min_alt, max_ref
 
 
