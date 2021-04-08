@@ -10,7 +10,7 @@ print("Running tests")
 
 
 this_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-data_dir = os.path.join(this_dir, 'tests', 'data', 'type_variants')
+data_dir = os.path.join(this_dir, 'tests', 'data', 'type_constellations')
 
 variants_list = [
             {'alt_allele': 'C', 'name': 'snp:T6954C', 'ref_allele': 'T', 'ref_start': 6954, 'type': "snp"},
