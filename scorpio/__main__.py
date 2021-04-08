@@ -10,7 +10,7 @@ from . import _program
 
 thisdir = os.path.abspath(os.path.dirname(__file__))
 
-def main(args=None):
+def main(sysargs = sys.argv[1:]):
     parser = argparse.ArgumentParser(
         prog="scorpio",
         description="Miscellaneous fasta manipulation tools",
@@ -87,6 +87,11 @@ def main(args=None):
     # _________________________________________________________________________#
 
     args = parser.parse_args()
+    if len(sysargs) < 1:
+        parser.print_help()
+        sys.exit(-1)
+    else:
+        args = parser.parse_args(sysargs)
 
     """
     Resolve output prefix and outfile
