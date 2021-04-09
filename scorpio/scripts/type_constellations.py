@@ -39,7 +39,7 @@ def load_feature_coordinates(reference_json):
                     elif "start" in json_dict[feature][item]["coordinates"]:
                         features_dict[item.lower()] = (json_dict[feature][item]["coordinates"]["start"],
                                                        json_dict[feature][item]["coordinates"]["end"])
-                print("Found reference feature %s with coordinates" % item, features_dict[item.lower()])
+                    print("Found reference feature %s with coordinates" % item, features_dict[item.lower()])
     if len(features_dict) == 0:
         sys.stderr.write("No features (keys \"genes\", \"proteins\" or \"features\" ) provided in JSON %s " %
                          reference_json)
@@ -179,7 +179,7 @@ def variant_to_variant_record(l, refseq, features_dict):
             info["length"] = 3*len(info["ref_allele"])
             info["ref_allele"] = str(ref_allele)
 
-    print("Found variant %s of type %s" % (info["name"], info["type"]))
+    #print("Found variant %s of type %s" % (info["name"], info["type"]))
     return info
 
 
@@ -206,7 +206,7 @@ def parse_json_in(refseq, features_dict, variants_file):
     returns variant_list name and rules
     """
     variant_list = []
-    print("Parsing constellation file %s" % variants_file)
+    print("\nParsing constellation file %s" % variants_file)
 
     in_json = open(variants_file, 'r')
     json_dict = json.load(in_json, strict=False)
@@ -314,7 +314,7 @@ def parse_variants_in(refseq, features_dict, variants_file, rule_dict = None):
     if len(variant_list) == 0 and not variants_file.endswith(".json"):
         variant_list, name = parse_textfile_in(refseq, features_dict, variants_file)
 
-    if rule_dict is not None:
+    if rule_dict is not None and len(variant_list) > 0:
         min_alt, max_ref = set_rules(variant_list, min_alt, max_ref)
         rule_dict[name] = {"min_alt": min_alt, "max_ref": max_ref, "compulsory": compulsory}
 
@@ -322,7 +322,7 @@ def parse_variants_in(refseq, features_dict, variants_file, rule_dict = None):
 
 
 def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
-    print("Call variant for ", var)
+    #print("Call variant for ", var)
     call = None
     query_allele = None
 
@@ -331,44 +331,44 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
         query_allele = ins_char
     elif var["type"] == "snp":
         query_allele = record_seq.upper()[var["ref_start"] - 1]
-        query_allele_minus = record_seq.upper()[var["ref_start"] - 2]
-        query_allele_plus = record_seq.upper()[var["ref_start"]]
-        print("Found", query_allele, query_allele_minus, query_allele_plus)
-        print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"], query_allele == var["alt_allele"])
+        #query_allele_minus = record_seq.upper()[var["ref_start"] - 2]
+        #query_allele_plus = record_seq.upper()[var["ref_start"]]
+        #print("Found", query_allele, query_allele_minus, query_allele_plus)
+        #print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"], query_allele == var["alt_allele"])
         if query_allele == var["ref_allele"]:
             call = 'ref'
         elif query_allele == var["alt_allele"]:
             call = 'alt'
         else:
             call = 'oth'
-        print(call, query_allele)
+        #print(call, query_allele)
 
     elif var["type"] == "aa":
         try:
             query_allele = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + 2].translate()
-            query_allele_minus = record_seq.upper()[var["ref_start"] - 2:var["ref_start"] + 1].translate()
-            query_allele_plus = record_seq.upper()[var["ref_start"]:var["ref_start"] + 3].translate()
-            print("Found", query_allele, query_allele_minus, query_allele_plus)
-            print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"],query_allele == var["alt_allele"])
+            #query_allele_minus = record_seq.upper()[var["ref_start"] - 2:var["ref_start"] + 1].translate()
+            #query_allele_plus = record_seq.upper()[var["ref_start"]:var["ref_start"] + 3].translate()
+            #print("Found", query_allele, query_allele_minus, query_allele_plus)
+            #print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"],query_allele == var["alt_allele"])
             if query_allele == var["ref_allele"]:
                 call = 'ref'
             elif query_allele == var["alt_allele"]:
                 call = 'alt'
             else:
                 call = 'oth'
-            print(call, query_allele)
+            #print(call, query_allele)
         except:
-            print("Except")
+            #print("Except")
             call = 'oth'
-        print(call, query_allele)
+        #print(call, query_allele)
 
     elif var["type"] == "del":
         query_allele = record_seq.upper()[var["ref_start"] - 1 :var["ref_start"] + var["length"] - 1]
-        query_allele_minus = record_seq.upper()[var["ref_start"] - 2:var["ref_start"] + var["length"] - 2]
-        query_allele_plus = record_seq.upper()[var["ref_start"]:var["ref_start"] + var["length"]]
-        print("Found", query_allele, query_allele_minus, query_allele_plus)
-        print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"],
-              query_allele == var["alt_allele"])
+        #query_allele_minus = record_seq.upper()[var["ref_start"] - 2:var["ref_start"] + var["length"] - 2]
+        #query_allele_plus = record_seq.upper()[var["ref_start"]:var["ref_start"] + var["length"]]
+        #print("Found", query_allele, query_allele_minus, query_allele_plus)
+        #print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"],
+        #      query_allele == var["alt_allele"])
         if query_allele == var["ref_allele"]:
             call = 'ref'
             query_allele = 0
@@ -379,7 +379,7 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
             call = 'oth'
             if not oth_char:
                 query_allele = "X"
-        print(call, query_allele)
+        #print(call, query_allele)
 
     if call == "oth" and var["type"] != "ins" and oth_char:
         query_allele = oth_char
@@ -428,9 +428,10 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
         constellation, variants, ignore = parse_variants_in(reference_seq, features_dict, constellation_file)
         if constellation_names and constellation not in constellation_names:
             continue
-        print("Found file %s for constellation %s containing variants %s" % (constellation_file, constellation, ",".join([v["name"] for v in variants])))
         if len(variants) > 0:
             constellation_dict[constellation] = variants
+            print("Found file %s for constellation %s containing %i variants" % (
+                    constellation_file, constellation, len([v["name"] for v in variants])))
         else:
             print("%s is not a valid constellation file" % constellation_file)
 
@@ -477,11 +478,12 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
         constellation, variants, rule_dict = parse_variants_in(reference_seq, features_dict, constellation_file, rule_dict)
         if constellation_names and constellation not in constellation_names:
             continue
-        print("Found file %s for constellation %s containing variants %s" % (constellation_file, constellation, ",".join([v["name"] for v in variants])))
-        print("Rule dict", rule_dict)
 
         if len(variants) > 0:
             constellation_dict[constellation] = variants
+            print("Found file %s for constellation %s containing %i variants" % (
+            constellation_file, constellation, len([v["name"] for v in variants])))
+            print("Rules", rule_dict[constellation])
         else:
             print("%s is not a valid constellation file" % constellation_file)
 

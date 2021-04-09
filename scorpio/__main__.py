@@ -58,7 +58,7 @@ def main(sysargs = sys.argv[1:]):
         help="Takes a set of lineage-defining constellations with rules and classifies sequences by them"
     )
     subparser_classify.add_argument(
-        '--reference-json', help='JSON file containing keys "genome" with reference sequence '
+        '--reference-json', dest="reference_json", help='JSON file containing keys "genome" with reference sequence '
                                  'and "proteins", "features" or "genes" with features of interest'
                                  ' and their coordinates'
     )
@@ -76,7 +76,7 @@ def main(sysargs = sys.argv[1:]):
         help="Takes a set of constellations and writes haplotypes (either as strings or individual columns)",
     )
     subparser_haplotype.add_argument(
-        '--reference-json', help='JSON file containing keys "genome" with reference sequence '
+        '--reference-json', dest="reference_json", help='JSON file containing keys "genome" with reference sequence '
                                  'and "proteins", "features" or "genes" with features of interest'
                                  ' and their coordinates'
     )
@@ -132,6 +132,34 @@ def main(sysargs = sys.argv[1:]):
 
     if not os.path.exists(args.prefix):
         os.mkdir(args.prefix)
+
+    if not args.reference_json or not args.constellations:
+        constellations_dir = constellations.__path__[0]
+        data_dir = os.path.join(constellations_dir, "data")
+        print(f"Looking in {data_dir} for data files...")
+        reference_json = args.reference_json
+        list_constellation_files = []
+
+        for r, d, f in os.walk(data_dir):
+            for fn in f:
+                if fn == "SARS-CoV-2.json":
+                    reference_json = os.path.join(r, fn)
+                elif fn.endswith(".json"):
+                    list_constellation_files.append(os.path.join(r, fn))
+                #elif fn.endswith(".csv"):
+                #    list_constellation_files.append(os.path.join(r, fn))
+        if (not args.reference_json and reference_json == "") or (not args.constellations and list_constellation_files == []):
+            print(sfunk.cyan(
+                """Please either provide a reference JSON and constellation definition file, or check your environment 
+                to make sure that constellations has been properly installed."""))
+            exit(1)
+        if not args.reference_json:
+            args.reference_json = reference_json
+            print("Using reference %s" %args.reference_json)
+        if not args.constellations:
+            args.constellations = list_constellation_files
+            print("Using constellations %s" % args.constellations)
+        print("\n")
 
     """
     Exit with help menu if no args supplied
