@@ -17,3 +17,4 @@ dependencies:
     - git+https://github.com/cov-ert/reportfunk.git
     - git+https://github.com/cov-ert/fastafunk.git
     - git+https://github.com/cov-ert/datafunk.git
+    - git+https://github.com/cov-lineages/constellations.git

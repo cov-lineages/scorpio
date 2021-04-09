@@ -82,7 +82,7 @@ def get_nuc_position_from_aa_description(cds, aa_pos, features_dict):
 
     nuc_pos is an integer which is 1-based start pos of codon
     """
-    if aa_pos is None:
+    if aa_pos is None or cds not in features_dict.keys():
         sys.stderr.write("I don't know about cds: %s \n" % cds)
         sys.stderr.write("please use one of: %s" % ",".join(features_dict.keys()))
         sys.exit(1)
@@ -190,8 +190,9 @@ def parse_name_from_file(constellation_file):
 
 
 def set_rules(variants, min_alt, max_ref):
+    assert len(variants) > 0
     if min_alt is None and max_ref is None:
-        min_alt = len([v for v in variants if v["type"] != "ins"])
+        min_alt = len([v for v in variants if v["type"] != "ins"]) - 1
         max_ref = 1
     elif max_ref is None:
         max_ref = len([v for v in variants if v["type"] != "ins"]) - min_alt
@@ -222,14 +223,17 @@ def parse_json_in(refseq, features_dict, variants_file):
 
     min_alt = None
     max_ref = None
+    compulsory = []
     if "min_alt" in json_dict:
         min_alt = json_dict["min_alt"]
     if "max_ref" in json_dict:
         max_ref = json_dict["max_ref"]
+    if "compulsory" in json_dict:
+        compulsory = json_dict["compulsory"]
 
     in_json.close()
 
-    return variant_list, name, min_alt, max_ref
+    return variant_list, name, min_alt, max_ref, compulsory
 
 
 def parse_csv_in(refseq, features_dict, variants_file):
@@ -237,6 +241,7 @@ def parse_csv_in(refseq, features_dict, variants_file):
     returns variant_list and name
     """
     variant_list = []
+    compulsory = []
     print("Parsing constellation file %s" % variants_file)
 
     name = parse_name_from_file(variants_file)
@@ -252,10 +257,12 @@ def parse_csv_in(refseq, features_dict, variants_file):
                 record = variant_to_variant_record(var, refseq, features_dict)
                 if record != {}:
                     variant_list.append(record)
+                if "compulsory" in reader.fieldnames and row["compulsory"] in ["True", True, "Y", "y", "Yes", "yes", "YES"]:
+                    compulsory.append(record["name"])
             else:
                 break
 
-    return variant_list, name
+    return variant_list, name, compulsory
 
 
 def parse_textfile_in(refseq, features_dict, variants_file):
@@ -298,92 +305,110 @@ def parse_variants_in(refseq, features_dict, variants_file, rule_dict = None):
     """
     variant_list = []
     min_alt, max_ref = None, None
+    compulsory = []
     if variants_file.endswith(".json"):
-        variant_list, name, min_alt, max_ref = parse_json_in(refseq, features_dict, variants_file)
+        variant_list, name, min_alt, max_ref, compulsory = parse_json_in(refseq, features_dict, variants_file)
     elif variants_file.endswith(".csv"):
-        variant_list, name = parse_csv_in(refseq, features_dict, variants_file)
+        variant_list, name, compulsory = parse_csv_in(refseq, features_dict, variants_file)
 
     if len(variant_list) == 0 and not variants_file.endswith(".json"):
-        variants_list, name = parse_textfile_in(refseq, features_dict, variants_file)
+        variant_list, name = parse_textfile_in(refseq, features_dict, variants_file)
 
     if rule_dict is not None:
         min_alt, max_ref = set_rules(variant_list, min_alt, max_ref)
-        rule_dict[name] = {"min_alt": min_alt, "max_ref": max_ref}
+        rule_dict[name] = {"min_alt": min_alt, "max_ref": max_ref, "compulsory": compulsory}
 
     return name, variant_list, rule_dict
 
 
-def call_variant(record_seq, var):
-    # print("Call variant for ", var)
+def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
+    print("Call variant for ", var)
     call = None
     query_allele = None
 
     if var["type"] == "ins":
         call = "oth"
-        query_allele = "?"
+        query_allele = ins_char
     elif var["type"] == "snp":
         query_allele = record_seq.upper()[var["ref_start"] - 1]
         query_allele_minus = record_seq.upper()[var["ref_start"] - 2]
         query_allele_plus = record_seq.upper()[var["ref_start"]]
-        # print("Found", query_allele, query_allele_minus, query_allele_plus)
+        print("Found", query_allele, query_allele_minus, query_allele_plus)
+        print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"], query_allele == var["alt_allele"])
         if query_allele == var["ref_allele"]:
             call = 'ref'
         elif query_allele == var["alt_allele"]:
             call = 'alt'
         else:
             call = 'oth'
+        print(call, query_allele)
 
     elif var["type"] == "aa":
         try:
             query_allele = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + 2].translate()
             query_allele_minus = record_seq.upper()[var["ref_start"] - 2:var["ref_start"] + 1].translate()
             query_allele_plus = record_seq.upper()[var["ref_start"]:var["ref_start"] + 3].translate()
-            # print("Found", query_allele, query_allele_minus, query_allele_plus)
+            print("Found", query_allele, query_allele_minus, query_allele_plus)
+            print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"],query_allele == var["alt_allele"])
             if query_allele == var["ref_allele"]:
                 call = 'ref'
             elif query_allele == var["alt_allele"]:
                 call = 'alt'
             else:
                 call = 'oth'
+            print(call, query_allele)
         except:
-            # print("Except")
+            print("Except")
             call = 'oth'
-            query_allele = "X"
+        print(call, query_allele)
 
     elif var["type"] == "del":
-        query_allele = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + var["length"] - 1]
+        query_allele = record_seq.upper()[var["ref_start"] - 1 :var["ref_start"] + var["length"] - 1]
+        query_allele_minus = record_seq.upper()[var["ref_start"] - 2:var["ref_start"] + var["length"] - 2]
+        query_allele_plus = record_seq.upper()[var["ref_start"]:var["ref_start"] + var["length"]]
+        print("Found", query_allele, query_allele_minus, query_allele_plus)
+        print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"],
+              query_allele == var["alt_allele"])
         if query_allele == var["ref_allele"]:
             call = 'ref'
+            query_allele = 0
         elif query_allele == "-" * var["length"]:
             call = 'alt'
             query_allele = var["length"]
         else:
             call = 'oth'
-            query_allele = "X"
+            if not oth_char:
+                query_allele = "X"
+        print(call, query_allele)
+
+    if call == "oth" and var["type"] != "ins" and oth_char:
+        query_allele = oth_char
 
     return call, query_allele
 
 
 def count_and_classify(record_seq, variant_list, rules):
-    counts = {'ref': 0, 'alt': 0, 'oth': 0}
+    counts = {'ref': 0, 'alt': 0, 'oth': 0, "compulsory": []}
 
     for var in variant_list:
-        call, query_allele = call_variant(record_seq, var)
+        call, query_allele = call_variant_from_fasta(record_seq, var)
         # print(var, call, query_allele)
         counts[call] += 1
+        if call == "alt" and var["name"] in rules["compulsory"]:
+            counts["compulsory"].append(var["name"])
 
-    if counts['alt'] > rules["min_alt"] and counts['ref'] < rules["max_ref"]:
+    if counts['alt'] > rules["min_alt"] and counts['ref'] < rules["max_ref"] and len(counts["compulsory"]) == len(rules["compulsory"]):
         return counts, True
     else:
         return counts, False
 
 
-def generate_barcode(record_seq, variant_list, ref_char=None):
+def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_char="X"):
     barcode_list = []
     counts = {'ref': 0, 'alt': 0, 'oth': 0}
 
     for var in variant_list:
-        call, query_allele = call_variant(record_seq, var)
+        call, query_allele = call_variant_from_fasta(record_seq, var, ins_char, oth_char)
         # print(var, call, query_allele)
         counts[call] += 1
         if ref_char is not None and call == 'ref':

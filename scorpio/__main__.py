@@ -4,6 +4,8 @@ import argparse
 import sys
 import os
 
+import constellations
+
 import scorpio.subcommands
 from scorpio import __version__
 from . import _program
@@ -17,6 +19,8 @@ def main(sysargs = sys.argv[1:]):
     )
 
     parser.add_argument("-v", "--version", action='version', version=f"scorpio {__version__}")
+    parser.add_argument("-cv", "--constellations-version", action='version', version=f"constellations {constellations.__version__}", help="show constellation's version number and exit")
+
     subparsers = parser.add_subparsers(
         title="Available subcommands", help="", metavar=""
     )
