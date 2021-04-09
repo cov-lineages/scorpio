@@ -4,7 +4,6 @@ from scorpio.scripts.type_constellations import *
 
 
 def run(options):
-    print(options)
     type_constellations(options.input,
                         options.constellations,
                         options.names,
