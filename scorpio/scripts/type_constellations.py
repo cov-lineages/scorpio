@@ -11,6 +11,10 @@ import re
 if sys.version_info[0] < 3:
     raise Exception("Python 3 or a more recent version is required.")
 
+global_aliases = {"spike": "s", "s": "spike",
+                  "envelope": "e", "e": "envelope",
+                  "membrane": "m", "m": "membrane",
+                  "nucleocapsid": "n", "n": "nucleocapsid"}
 
 def load_feature_coordinates(reference_json):
     """
@@ -32,14 +36,18 @@ def load_feature_coordinates(reference_json):
     for feature in ["genes"]:  # , "proteins", "features"]:
         if feature in json_dict:
             for item in json_dict[feature]:
+                name = item.lower()
+                if "name" in json_dict[feature][item]:
+                    name = json_dict[feature][item]["name"].lower()
+
                 if "coordinates" in json_dict[feature][item]:
                     if "from" in json_dict[feature][item]["coordinates"]:
-                        features_dict[item.lower()] = (json_dict[feature][item]["coordinates"]["from"],
+                        features_dict[name] = (json_dict[feature][item]["coordinates"]["from"],
                                                        json_dict[feature][item]["coordinates"]["to"])
                     elif "start" in json_dict[feature][item]["coordinates"]:
-                        features_dict[item.lower()] = (json_dict[feature][item]["coordinates"]["start"],
+                        features_dict[name] = (json_dict[feature][item]["coordinates"]["start"],
                                                        json_dict[feature][item]["coordinates"]["end"])
-                    print("Found reference feature %s with coordinates" % item, features_dict[item.lower()])
+                    print("Found reference feature %s with coordinates" % name, features_dict[name])
     if len(features_dict) == 0:
         sys.stderr.write("No features (keys \"genes\", \"proteins\" or \"features\" ) provided in JSON %s " %
                          reference_json)
@@ -51,12 +59,14 @@ def load_feature_coordinates(reference_json):
 
 def resolve_ambiguous_cds(cds, aa_pos, features_dict):
     cds = cds.lower()
+
     if cds in features_dict:
         return cds, aa_pos
-    if cds[0] in features_dict:
-        return cds, aa_pos
 
-    if not cds.startswith("orf"):
+    if cds in global_aliases and global_aliases[cds] in features_dict:
+        return global_aliases[cds], aa_pos
+
+    if cds[0].isdigit():
         cds = "orf" + cds
         if cds in features_dict:
             return cds, aa_pos
@@ -206,7 +216,7 @@ def parse_json_in(refseq, features_dict, variants_file):
     returns variant_list name and rules
     """
     variant_list = []
-    print("\nParsing constellation file %s" % variants_file)
+    print("\nParsing constellation JSON file %s" % variants_file)
 
     in_json = open(variants_file, 'r')
     json_dict = json.load(in_json, strict=False)
@@ -242,26 +252,35 @@ def parse_csv_in(refseq, features_dict, variants_file):
     """
     variant_list = []
     compulsory = []
-    print("Parsing constellation file %s" % variants_file)
+    print("\nParsing constellation CSV file %s" % variants_file)
 
     name = parse_name_from_file(variants_file)
 
-    with open("%s" % variants_file, 'r') as csv_in:
-        reader = csv.DictReader(csv_in)
-        for row in reader:
-            if "id" in reader.fieldnames:
-                if ":" not in row["id"] and "gene" in reader.fieldnames:
-                    var = "%s:%s" % (row["gene"], row["id"])
-                else:
-                    var = row["id"]
-                record = variant_to_variant_record(var, refseq, features_dict)
-                if record != {}:
-                    variant_list.append(record)
-                if "compulsory" in reader.fieldnames and row["compulsory"] in ["True", True, "Y", "y", "Yes", "yes", "YES"]:
-                    compulsory.append(record["name"])
-            else:
-                break
+    csv_in = open("%s" % variants_file, 'r')
+    reader = csv.DictReader(csv_in, delimiter=",")
 
+    if "id" not in reader.fieldnames:
+        csv_in.close()
+        csv_in = open("%s" % variants_file, 'r', encoding="utf-8-sig")
+        reader = csv.DictReader(csv_in, delimiter=",")
+
+        if "id" not in reader.fieldnames:
+            csv_in.close()
+            print("CSV headerline does not contain 'id': %s" % reader.fieldnames)
+            return variant_list, name, compulsory
+
+    for row in reader:
+        if ":" not in row["id"] and "gene" in reader.fieldnames:
+            var = "%s:%s" % (row["gene"], row["id"])
+        else:
+            var = row["id"]
+        record = variant_to_variant_record(var, refseq, features_dict)
+        if record != {}:
+            variant_list.append(record)
+        if "compulsory" in reader.fieldnames and row["compulsory"] in ["True", True, "Y", "y", "Yes", "yes", "YES"]:
+            compulsory.append(record["name"])
+
+    csv_in.close()
     return variant_list, name, compulsory
 
 
@@ -270,7 +289,7 @@ def parse_textfile_in(refseq, features_dict, variants_file):
     returns variant_list and name
     """
     variant_list = []
-    print("Parsing constellation file %s" % variants_file)
+    print("\nParsing constellation text file %s" % variants_file)
 
     name = parse_name_from_file(variants_file)
 

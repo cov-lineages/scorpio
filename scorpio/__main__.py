@@ -146,8 +146,8 @@ def main(sysargs = sys.argv[1:]):
                     reference_json = os.path.join(r, fn)
                 elif fn.endswith(".json"):
                     list_constellation_files.append(os.path.join(r, fn))
-                #elif fn.endswith(".csv"):
-                #    list_constellation_files.append(os.path.join(r, fn))
+                elif fn.endswith(".csv"):
+                    list_constellation_files.append(os.path.join(r, fn))
         if (not args.reference_json and reference_json == "") or (not args.constellations and list_constellation_files == []):
             print(sfunk.cyan(
                 """Please either provide a reference JSON and constellation definition file, or check your environment 
