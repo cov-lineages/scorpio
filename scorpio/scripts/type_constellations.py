@@ -116,7 +116,7 @@ def variant_to_variant_record(l, refseq, features_dict):
     del:11288:9
     aa:orf1ab:T1001I
     aa:orf1ab:T1001del
-    aa:orf1ab:T1001
+    aa:orf1ab:T1001 # this is for ambiguous AA change, NOT DELETION
 
     to a dict
     """
@@ -184,10 +184,14 @@ def variant_to_variant_record(l, refseq, features_dict):
         info["cds"] = cds
         info["aa_pos"] = aa_pos
         info["ref_start"] = ref_start
-        if info["alt_allele"] in ['', 'del'] or '-' in info["alt_allele"]:
+        if info["alt_allele"] in ['del', '-']:
             info["type"] = "del"
             info["length"] = 3*len(info["ref_allele"])
             info["ref_allele"] = str(ref_allele)
+        elif info["alt_allele"] == '':
+            info["fuzzy"] = True
+        else:
+            info["fuzzy"] = False
 
     #print("Found variant %s of type %s" % (info["name"], info["type"]))
     return info
@@ -356,6 +360,8 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
         #print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"], query_allele == var["alt_allele"])
         if query_allele == var["ref_allele"]:
             call = 'ref'
+        elif query_allele == "N":
+            call = 'ambig'
         elif query_allele == var["alt_allele"]:
             call = 'alt'
         else:
@@ -371,7 +377,9 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
             #print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"],query_allele == var["alt_allele"])
             if query_allele == var["ref_allele"]:
                 call = 'ref'
-            elif query_allele == var["alt_allele"]:
+            elif query_allele == "X":
+                call = 'ambig'
+            elif query_allele == var["alt_allele"] or var["fuzzy"]:
                 call = 'alt'
             else:
                 call = 'oth'
@@ -382,7 +390,8 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
         #print(call, query_allele)
 
     elif var["type"] == "del":
-        query_allele = record_seq.upper()[var["ref_start"] - 1 :var["ref_start"] + var["length"] - 1]
+        query_allele = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + var["length"] - 1]
+        #print("del allele", query_allele)
         #query_allele_minus = record_seq.upper()[var["ref_start"] - 2:var["ref_start"] + var["length"] - 2]
         #query_allele_plus = record_seq.upper()[var["ref_start"]:var["ref_start"] + var["length"]]
         #print("Found", query_allele, query_allele_minus, query_allele_plus)
@@ -391,6 +400,12 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
         if query_allele == var["ref_allele"]:
             call = 'ref'
             query_allele = 0
+        elif "N" in query_allele:
+            call = 'ambig'
+            if not oth_char:
+                query_allele = "X"
+            else:
+                query_allele = "N"
         elif query_allele == "-" * var["length"]:
             call = 'alt'
             query_allele = var["length"]
@@ -407,11 +422,11 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
 
 
 def count_and_classify(record_seq, variant_list, rules):
-    counts = {'ref': 0, 'alt': 0, 'oth': 0, "compulsory": []}
+    counts = {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0, "compulsory": []}
 
     for var in variant_list:
         call, query_allele = call_variant_from_fasta(record_seq, var)
-        # print(var, call, query_allele)
+        #print(var, call, query_allele)
         counts[call] += 1
         if call == "alt" and var["name"] in rules["compulsory"]:
             counts["compulsory"].append(var["name"])
@@ -424,7 +439,7 @@ def count_and_classify(record_seq, variant_list, rules):
 
 def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_char="X"):
     barcode_list = []
-    counts = {'ref': 0, 'alt': 0, 'oth': 0}
+    counts = {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0}
 
     for var in variant_list:
         call, query_allele = call_variant_from_fasta(record_seq, var, ins_char, oth_char)
@@ -461,7 +476,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
     if output_counts:
         for constellation in constellation_dict:
             counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation), "w")
-            counts_out[constellation].write("query,ref_count,alt_count,other_count,fraction_alt\n")
+            counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,fraction_alt\n")
 
     with open(in_fasta, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
@@ -474,8 +489,8 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
             for constellation in constellation_dict:
                 barcode, counts = generate_barcode(record.seq, constellation_dict[constellation], ref_char)
                 if output_counts:
-                    counts_out[constellation].write("%s,%i,%i,%i,%s\n" % (record.id, counts['ref'], counts['alt'], counts['oth'],
-                                str(round(counts['alt'] / (counts['alt'] + counts['ref'] + counts['oth']), 4))))
+                    counts_out[constellation].write("%s,%i,%i,%i,%i,%s\n" % (record.id, counts['ref'], counts['alt'], counts['ambig'], counts['oth'],
+                                str(round(counts['alt'] / (counts['alt'] + counts['ref'] + counts['oth'] + counts['ambig']), 4))))
                 out_list.append(barcode)
 
             variants_out.write("%s\n" % ",".join(out_list))
@@ -513,7 +528,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
     if output_counts:
         for constellation in constellation_dict:
             counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation), "w")
-            counts_out[constellation].write("query,ref_count,alt_count,other_count,fraction_alt,call\n")
+            counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,fraction_alt,call\n")
 
     with open(in_fasta, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
@@ -529,8 +544,8 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                     lineages.append(constellation)
                 if output_counts:
                     counts_out[constellation].write(
-                        "%s,%i,%i,%i,%s\n" % (record.id, counts['ref'], counts['alt'], counts['oth'],
-                                              str(round(counts['alt'] / (counts['alt'] + counts['ref'] + counts['oth']),
+                        "%s,%i,%i,%i,%i,%s\n" % (record.id, counts['ref'], counts['alt'], counts['ambig'], counts['oth'],
+                                              str(round(counts['alt'] / (counts['alt'] + counts['ref'] + counts['oth'] + counts['ambig']),
                                                         4))))
 
             variants_out.write("%s,%s\n" % (record.id, " ".join(lineages)))

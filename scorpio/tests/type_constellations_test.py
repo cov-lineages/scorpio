@@ -19,7 +19,11 @@ variants_list = [
             {'alt_allele': 'C', 'name': 'nuc:T6954C', 'ref_allele': 'T', 'ref_start': 6954, 'type': "snp"},
             {'name': 'del:11288:9', 'length': 9, 'ref_start': 11288, 'type': "del", "ref_allele": "TCTGGTTTT"},
             {'cds': 'orf1a', 'ref_allele': 'T', 'aa_pos': 1001, 'alt_allele': 'I', 'name': 'orf1ab:T1001I',
-             'type': 'aa', 'ref_start': 3266},
+             'type': 'aa', 'ref_start': 3266, 'fuzzy': False},
+            {'cds': 'orf1a', 'ref_allele': 'T', 'aa_pos': 1001, 'alt_allele': '', 'name': 'orf1ab:T1001',
+             'type': 'aa', 'ref_start': 3266, 'fuzzy': True},
+            {'cds': 'orf1a', 'ref_allele': 'TI', 'aa_pos': 1001, 'alt_allele': '', 'name': '1ab:TI1001',
+             'type': 'aa', 'ref_start': 3266, 'fuzzy': True},
             {'cds': 'orf1a', 'ref_allele': 'ACT', 'aa_pos': 1001, 'alt_allele': 'del', 'name': 'orf1ab:T1001del',
              'type': 'del', 'ref_start': 3266, 'length':3},
             {'cds': 'orf1a', 'ref_allele': 'ACT', 'aa_pos': 1001, 'alt_allele': '-', 'name': 'orf1ab:T1001-',
@@ -37,7 +41,8 @@ variants_list = [
 json_file = "%s/../SARS-CoV-2.json" % data_dir
 refseq, features_dict = load_feature_coordinates(json_file)
 
-aa1 = {"name": "aa1", "type": "aa", "ref_start": 5, "ref_allele": "L", "alt_allele": "S"}
+aa1 = {"name": "aa1", "type": "aa", "ref_start": 5, "ref_allele": "L", "alt_allele": "S", "fuzzy": False}
+aa2 = {"name": "aa2", "type": "aa", "ref_start": 5, "ref_allele": "L", "alt_allele": "", "fuzzy": True}
 snp1 = {"name": "snp1", "type": "snp", "ref_start": 10, "ref_allele": "T", "alt_allele": "A"}
 snp2 = {"name": "snp2", "type": "snp", "ref_start": 1, "ref_allele": "A", "alt_allele": "T"}
 del1 = {"name": "del1", "type": "del", "ref_start": 15, "ref_allele": "AG", "alt_allele": "", "length": 2}
@@ -101,7 +106,8 @@ def test_get_nuc_position_from_aa_description():
 
 
 def test_variant_to_variant_record():
-    in_variant = ["snp:T6954C", "nuc:T6954C", "del:11288:9", "aa:orf1ab:T1001I", "aa:orf1ab:T1001del",
+    in_variant = ["snp:T6954C", "nuc:T6954C", "del:11288:9", "aa:orf1ab:T1001I", "aa:orf1ab:T1001",
+                  "aa:1ab:TI1001", "aa:orf1ab:T1001del",
                   "aa:orf1ab:T1001-", "aa:1ab:T1001del", "1ab:T1001del", "1ab:TI1001-"]
     expect = variants_list
 
@@ -113,7 +119,7 @@ def test_variant_to_variant_record():
 
 def test_set_rules():
     in_pairs = [(None, None), (None, 4), (4, None), (4, 6)]
-    expect_pairs = [(8, 1), (5, 4), (4, 5), (4, 6)]
+    expect_pairs = [(10, 1), (7, 4), (4, 7), (4, 6)]
     for i in range(len(in_pairs)):
         result = set_rules(variants_list, in_pairs[i][0], in_pairs[i][1])
         print(result)
@@ -172,10 +178,11 @@ def test_parse_variants_in():
 
 
 def test_call_variant_from_fasta():
-    variants = [aa1, snp1, del1]
+    variants = [aa1, aa2, snp1, del1]
 
     ref_string = "aaaattagctcgtaagctcgcaatag"
     alt_string = "aaaatcagcacgta--ctcgcaatag"
+    ambig_string = "nnnnnnnnnnnnnnnnnnnnnnnnnnnn"
     oth_string = "aaaattcgcccgta-gctcgcaatag"
 
     for var in variants:
@@ -186,14 +193,19 @@ def test_call_variant_from_fasta():
     for var in variants:
         call, query_allele = call_variant_from_fasta(Seq(alt_string), var)
         assert call == "alt"
-        assert query_allele == var["alt_allele"] or query_allele == var["length"]
+        assert query_allele == var["alt_allele"] or (var["type"] == 'del' and query_allele == var["length"]) or (var["fuzzy"] and query_allele != var["ref_allele"])
+
+    for var in variants:
+        call, query_allele = call_variant_from_fasta(Seq(ambig_string), var)
+        assert call == "ambig"
+        assert query_allele in ["X", "N", "NN", "--"]
 
     for var in variants:
         call, query_allele = call_variant_from_fasta(Seq(oth_string), var, oth_char="X")
-        assert call == "oth"
-        assert query_allele == "X"
+        assert call == "oth" or (call == "alt" and var["fuzzy"])
+        assert query_allele == "X" or var["fuzzy"]
         call, query_allele = call_variant_from_fasta(Seq(oth_string), var)
-        assert call == "oth"
+        assert call == "oth" or (call == "alt" and var["fuzzy"])
         assert query_allele != var["alt_allele"] and query_allele != var["ref_allele"]
 
     for seq in [Seq(ref_string), Seq(alt_string), Seq(oth_string)]:
@@ -203,7 +215,7 @@ def test_call_variant_from_fasta():
 
 
 def test_count_and_classify():
-    variants = [aa1, snp1, snp2, del1, ins1]
+    variants = [aa1, aa2, snp1, snp2, del1, ins1]
 
     ref_string = "aaaattagctcgtaagctcgcaatag"
     alt_string = "aaaatcagcacgta--ctcgcaatag"
@@ -213,10 +225,10 @@ def test_count_and_classify():
 
     rules = {"min_alt": 1, "max_ref": 1, "compulsory": ["snp2"]}
     expect_classify = [False, False, True, False]
-    expect_counts = [{"ref": 4, "alt": 0, "oth": 1, "compulsory": []},
-                     {"ref": 1, "alt": 3, "oth": 1, "compulsory": []},
-                     {"ref": 0, "alt": 4, "oth": 1, "compulsory": ["snp2"]},
-                     {"ref": 0, "alt": 0, "oth": 5, "compulsory": []}]
+    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "compulsory": []},
+                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "compulsory": []},
+                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "compulsory": ["snp2"]},
+                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "compulsory": []}]
     for i in range(len(seqs)):
         counts, classify = count_and_classify(seqs[i], variants, rules)
         print(i, counts, classify)
@@ -224,7 +236,7 @@ def test_count_and_classify():
         assert counts == expect_counts[i]
 
 def test_generate_barcode():
-    variants = [aa1, snp1, snp2, del1, ins1]
+    variants = [aa1, aa2, snp1, snp2, del1, ins1]
 
     ref_string = "aaaattagctcgtaagctcgcaatag"
     alt_string = "aaaatcagcacgta--ctcgcaatag"
@@ -232,14 +244,14 @@ def test_generate_barcode():
     oth_string = "gaaattcgcccgta-gctcgcaatag"
     seqs = [Seq(ref_string), Seq(alt_string), Seq(alt_plus_string), Seq(oth_string)]
 
-    expect_barcode_dash = ["----?", "SA-2?", "SAT2?", "XXXX?"]
-    expect_barcode_ref = ["LTA0?", "SAA2?", "SAT2?", "XXXX?"]
-    expect_barcode_ref_oth = ["LTA0?", "SAA2?", "SAT2?", "FCGX?"]
-    expect_barcode_ins = ["----$", "SA-2$", "SAT2$", "XXXX$"]
-    expect_counts = [{"ref": 4, "alt": 0, "oth": 1},
-                     {"ref": 1, "alt": 3, "oth": 1},
-                     {"ref": 0, "alt": 4, "oth": 1},
-                     {"ref": 0, "alt": 0, "oth": 5}]
+    expect_barcode_dash = ["-----?", "SSA-2?", "SSAT2?", "XFXXX?"]
+    expect_barcode_ref = ["LLTA0?", "SSAA2?", "SSAT2?", "XFXXX?"]
+    expect_barcode_ref_oth = ["LLTA0?", "SSAA2?", "SSAT2?", "FFCGX?"]
+    expect_barcode_ins = ["-----$", "SSA-2$", "SSAT2$", "XFXXX$"]
+    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1},
+                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1},
+                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1},
+                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5}]
     for i in range(len(seqs)):
         barcode, counts = generate_barcode(seqs[i], variants, ref_char="-", ins_char="?", oth_char="X")
         print(i, barcode, counts)
