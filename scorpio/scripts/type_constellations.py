@@ -230,7 +230,9 @@ def parse_json_in(refseq, features_dict, variants_file):
             if record != {}:
                 variant_list.append(record)
 
-    if "name" in json_dict:
+    if "label" in json_dict:
+        name = json_dict["label"]
+    elif "name" in json_dict:
         name = json_dict["name"]
     else:
         name = parse_name_from_file(variants_file)
