@@ -548,7 +548,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                                               str(round(counts['alt'] / (counts['alt'] + counts['ref'] + counts['oth'] + counts['ambig']),
                                                         4))))
 
-            variants_out.write("%s,%s\n" % (record.id, " ".join(lineages)))
+            variants_out.write("%s,%s\n" % (record.id, "|".join(lineages)))
 
     variants_out.close()
     for constellation in counts_out:
