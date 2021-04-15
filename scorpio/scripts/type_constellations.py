@@ -522,7 +522,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             print("%s is not a valid constellation file" % constellation_file)
 
     variants_out = open(out_csv, "w")
-    variants_out.write("query,lineage\n")
+    variants_out.write("query,constellations\n")
 
     counts_out = {}
     if output_counts:
