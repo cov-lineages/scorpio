@@ -1,7 +1,7 @@
 # scorpio
 serious constellations of reoccurring phylogenetically-independent origin
 
-<img src="https://github.com/cov-lineages/scorpio/blob/master/docs/scorpio_logo.png" width="300">
+<img src="https://github.com/cov-lineages/scorpio/blob/main/docs/scorpio_logo.png" width="300">
 
 ## Command line options:
 
