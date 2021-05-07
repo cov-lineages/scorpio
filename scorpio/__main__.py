@@ -101,6 +101,33 @@ def main(sysargs = sys.argv[1:]):
 
     subparser_report.set_defaults(func=scorpio.subcommands.report.run)
 
+    # _______________________________  define  __________________________________#
+
+    subparser_define = subparsers.add_parser(
+        "define",
+        parents=[common],
+        help="Takes a CSV column of per sample mutations, and a column defining groups and extracts group-defining "
+             "mutations",
+    )
+    subparser_define.add_argument(
+        '--reference-json', dest="reference_json", help='JSON file containing keys "genome" with reference sequence '
+                                                        'and "proteins", "features" or "genes" with features of interest'
+                                                        ' and their coordinates'
+    )
+    subparser_define.add_argument(
+        '--in-groups', dest='in_groups', required=False,
+        help='CSV of containing sequence_name and a column defining groups '
+    )
+    subparser_define.add_argument(
+        '--group-column', dest='group_column', required=False, default='lineage',
+        help='Column name defining the groups')
+    subparser_define.add_argument(
+        '--index-column', dest='index_column', required=False, default='sequence_name',
+        help='Taxon column name')
+
+    subparser_define.set_defaults(func=scorpio.subcommands.define.run)
+
+
     # _________________________________________________________________________#
 
     args = parser.parse_args()
