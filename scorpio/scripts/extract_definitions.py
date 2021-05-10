@@ -182,8 +182,9 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
 
     for group in var_dict:
         common, intermediate = get_common_mutations(var_dict[group])
-        print_worthy = define_mutations(common, feature_dict, reference_seq)
-        write_constellation(prefix, group, print_worthy, intermediate)
+        nice_common = define_mutations(common, feature_dict, reference_seq)
+        nice_intermediate = define_mutations(intermediate, feature_dict, reference_seq)
+        write_constellation(prefix, group, nice_common, nice_intermediate)
 
 
 def main():
