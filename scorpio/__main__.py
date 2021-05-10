@@ -66,6 +66,11 @@ def main(sysargs = sys.argv[1:]):
         "--output-counts", dest="output_counts", action="store_true",
         help="Save a file per constellation of ref, alt and other counts"
     )
+    subparser_classify.add_argument(
+        "--call-all", dest="call_all", action="store_true",
+        help="Allow multiple classifications"
+    )
+
     subparser_classify.set_defaults(func=scorpio.subcommands.classify.run)
 
     # _______________________________  haplotype  __________________________________#

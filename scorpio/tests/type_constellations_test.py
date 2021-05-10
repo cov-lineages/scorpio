@@ -225,10 +225,10 @@ def test_count_and_classify():
 
     rules = {"min_alt": 1, "max_ref": 1, "compulsory": ["snp2"]}
     expect_classify = [False, False, True, False]
-    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "compulsory": []},
-                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "compulsory": []},
-                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "compulsory": ["snp2"]},
-                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "compulsory": []}]
+    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "compulsory": [], "support": 0.0, "conflict": 0.8333},
+                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "compulsory": [], "support": 0.6667, "conflict": 0.1667},
+                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "compulsory": ["snp2"], "support": 0.8333, "conflict": 0.0},
+                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "compulsory": [], "support": 0.1667, "conflict": 0.0}]
     for i in range(len(seqs)):
         counts, classify = count_and_classify(seqs[i], variants, rules)
         print(i, counts, classify)
@@ -248,10 +248,13 @@ def test_generate_barcode():
     expect_barcode_ref = ["LLTA0?", "SSAA2?", "SSAT2?", "XFXXX?"]
     expect_barcode_ref_oth = ["LLTA0?", "SSAA2?", "SSAT2?", "FFCGX?"]
     expect_barcode_ins = ["-----$", "SSA-2$", "SSAT2$", "XFXXX$"]
-    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1},
-                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1},
-                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1},
-                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5}]
+    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "support": 0.0, "conflict": 0.8333},
+                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "support": 0.6667,
+                      "conflict": 0.1667},
+                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "support": 0.8333,
+                      "conflict": 0.0},
+                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "support": 0.1667, "conflict": 0.0}]
+
     for i in range(len(seqs)):
         barcode, counts = generate_barcode(seqs[i], variants, ref_char="-", ins_char="?", oth_char="X")
         print(i, barcode, counts)

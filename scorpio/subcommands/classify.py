@@ -9,4 +9,5 @@ def run(options):
                         options.names,
                         options.output,
                         options.reference_json,
-                        options.output_counts)
+                        options.output_counts,
+                        options.call_all)

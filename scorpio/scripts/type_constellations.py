@@ -433,6 +433,9 @@ def count_and_classify(record_seq, variant_list, rules):
         if call == "alt" and var["name"] in rules["compulsory"]:
             counts["compulsory"].append(var["name"])
 
+    counts['support'] = round(counts['alt']/float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']),4)
+    counts['conflict'] = round(counts['ref'] /float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']),4)
+
     if counts['alt'] > rules["min_alt"] and counts['ref'] < rules["max_ref"] and len(counts["compulsory"]) == len(rules["compulsory"]):
         return counts, True
     else:
@@ -451,6 +454,9 @@ def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_
             barcode_list.append(str(ref_char))
         else:
             barcode_list.append(str(query_allele))
+
+    counts['support'] = round(counts['alt'] / float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']), 4)
+    counts['conflict'] = round(counts['ref'] / float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']), 4)
 
     return ''.join(barcode_list), counts
 
@@ -478,7 +484,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
     if output_counts:
         for constellation in constellation_dict:
             counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation), "w")
-            counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,fraction_alt\n")
+            counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,support,conflict\n")
 
     with open(in_fasta, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
@@ -491,8 +497,8 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
             for constellation in constellation_dict:
                 barcode, counts = generate_barcode(record.seq, constellation_dict[constellation], ref_char)
                 if output_counts:
-                    counts_out[constellation].write("%s,%i,%i,%i,%i,%s\n" % (record.id, counts['ref'], counts['alt'], counts['ambig'], counts['oth'],
-                                str(round(counts['alt'] / (counts['alt'] + counts['ref'] + counts['oth'] + counts['ambig']), 4))))
+                    counts_out[constellation].write("%s,%i,%i,%i,%i,%f,%f\n" % (record.id, counts['ref'], counts['alt'],
+                                                 counts['ambig'], counts['oth'], counts['support'], counts['conflict']))
                 out_list.append(barcode)
 
             variants_out.write("%s\n" % ",".join(out_list))
@@ -504,7 +510,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
 
 def classify_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json,
-                            output_counts=False):
+                            output_counts=False, call_all=False):
 
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
@@ -530,7 +536,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
     if output_counts:
         for constellation in constellation_dict:
             counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation), "w")
-            counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,fraction_alt,call\n")
+            counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,support,conflict,call\n")
 
     with open(in_fasta, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
@@ -540,16 +546,26 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                 sys.exit(1)
 
             lineages = []
+            best_constellation = None
+            best_support = 0
+            best_conflict = 1
             for constellation in constellation_dict:
                 counts, call = count_and_classify(record.seq, constellation_dict[constellation], rule_dict[constellation])
                 if call:
-                    lineages.append(constellation)
+                    if call_all:
+                        lineages.append(constellation)
+                    elif not best_constellation \
+                        or (counts['support'] > best_support) \
+                        or (counts['support'] == best_support and counts['conflict'] < best_conflict):
+                        best_constellation = constellation
+                        best_support = counts['support']
+                        best_conflict = counts['conflict']
                 if output_counts:
                     counts_out[constellation].write(
-                        "%s,%i,%i,%i,%i,%s\n" % (record.id, counts['ref'], counts['alt'], counts['ambig'], counts['oth'],
-                                              str(round(counts['alt'] / (counts['alt'] + counts['ref'] + counts['oth'] + counts['ambig']),
-                                                        4))))
-
+                        "%s,%i,%i,%i,%i,%f,%f,%s\n" % (record.id, counts['ref'], counts['alt'], counts['ambig'],
+                                                       counts['oth'], counts['support'], counts['conflict'], call))
+            if not call_all and best_constellation:
+                lineages.append(best_constellation)
             variants_out.write("%s,%s\n" % (record.id, "|".join(lineages)))
 
     variants_out.close()
