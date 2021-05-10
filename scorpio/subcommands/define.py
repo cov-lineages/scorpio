@@ -9,4 +9,5 @@ def run(options):
                         options.group_column,
                         options.index_column,
                         options.reference_json,
-                        options.prefix)
+                        options.prefix,
+                        options.subset)

@@ -25,7 +25,7 @@ def parse_args():
     return args
 
 
-def get_group_dict(in_variants, group_column, index_column):
+def get_group_dict(in_variants, group_column, index_column, subset):
     group_dict = {}
     groups = set()
 
@@ -33,6 +33,8 @@ def get_group_dict(in_variants, group_column, index_column):
         reader = csv.DictReader(f)
         for row in reader:
             if group_column in row and index_column in row:
+                if subset and row[group_column] not in subset:
+                    continue
                 if row[index_column] in group_dict:
                     print("%s is a duplicate in group CSV, keeping first")
                 else:
@@ -111,31 +113,55 @@ def define_mutations(list_variants, feature_dict, reference_seq):
     merged_list = []
 
     intermediate_list = []
-    for var in list_variants:
+    for variant in list_variants:
+        if ":" in variant:
+            var, freq = variant.split(":")
+        else:
+            var = variant
+            freq = None
         if var.startswith("del"):
-            merged_list.append(':'.join(var.split("_")))
+            new_var = ':'.join(var.split("_"))
+            if freq:
+                merged_list.append("%s:%s" %(new_var, freq))
+            else:
+                merged_list.append(new_var)
         elif var.startswith("ins") or var.startswith("del"):
             i, pos, add = var.split("_")
-            merged_list.append("%s:%i+%s" % (i, pos, add))
+            new_var = "%s:%i+%s" % (i, pos, add)
+            if freq:
+                merged_list.append("%s:%s" % (new_var, freq))
+            else:
+                merged_list.append(new_var)
         else:
-            intermediate_list.append([var[0], int(var[1:-1]), var[-1]])
+            intermediate_list.append([var[0], int(var[1:-1]), var[-1], freq])
 
     intermediate_list.sort(key=itemgetter(1))
-    current = ["", 1, ""]
+    current = ["", 1, "", None]
     for new in intermediate_list:
-        #print(new, current)
-        if new[1] == current[1] + 1:
+        print(new, current)
+        if new[1] == current[1] + len(current[0]):
+            print("merge")
             current[0] += new[0]
             current[2] += new[2]
+            if new[3] and current[3]:
+                current[3] = min(current[3], new[3])
+            elif new[3]:
+                current[3] = new[3]
         elif current[0] != "":
             var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq)
-            merged_list.append(var)
+            if freq:
+                merged_list.append("%s:%s" % (var, freq))
+            else:
+                merged_list.append(var)
             current = new
         else:
             current = new
     if current[0] != "":
         var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq)
-        merged_list.append(var)
+        if freq:
+            merged_list.append("%s:%s" % (var, freq))
+        else:
+            merged_list.append(var)
     return merged_list
 
 
@@ -149,11 +175,11 @@ def write_constellation(prefix, group, list_variants, list_intermediates):
         json.dump(group_dict, outfile, indent=4)
 
 
-def extract_definitions(in_variants, in_groups, group_column, index_column, reference_json, prefix):
+def extract_definitions(in_variants, in_groups, group_column, index_column, reference_json, prefix, subset):
     if not in_groups:
         in_groups = in_variants
 
-    group_dict = get_group_dict(in_groups, group_column, index_column)
+    group_dict = get_group_dict(in_groups, group_column, index_column, subset)
 
     reference_seq, feature_dict = load_feature_coordinates(reference_json)
 
@@ -174,6 +200,8 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
         for row in reader:
             if index_column in row and var_column in row:
                 index = row[index_column]
+                if index not in group_dict:
+                    continue
                 group = group_dict[index]
                 variants = row[var_column]
                 update_var_dict(var_dict, group, variants)
@@ -189,7 +217,7 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
 
 def main():
     args = parse_args()
-    extract_definitions(args.in_variants, args.in_groups, args.group_column, args.index_column, args.reference_json, args.prefix)
+    extract_definitions(args.in_variants, args.in_groups, args.group_column, args.index_column, args.reference_json, args.prefix, args.subset)
 
 
 if __name__ == '__main__':

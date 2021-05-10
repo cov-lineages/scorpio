@@ -28,7 +28,7 @@ def main(sysargs = sys.argv[1:]):
     common = argparse.ArgumentParser(prog=_program, add_help=False)
 
     io_group = common.add_argument_group('Input/output options')
-    io_group.add_argument("-i", "--input", dest="input", required=True, help="Primary input file (FASTA)")
+    io_group.add_argument("-i", "--input", dest="input", required=True, help="Primary input file")
     io_group.add_argument("-m", "--metadata", dest="metadata", required=False, help="CSV of associated metadata")
 
     io_group.add_argument("-o", "--output", dest="output", required=False, help="Output file or path")
@@ -116,14 +116,15 @@ def main(sysargs = sys.argv[1:]):
     )
     subparser_define.add_argument(
         '--in-groups', dest='in_groups', required=False,
-        help='CSV of containing sequence_name and a column defining groups '
-    )
+        help='CSV of containing sequence_name and a column defining groups ')
     subparser_define.add_argument(
         '--group-column', dest='group_column', required=False, default='lineage',
         help='Column name defining the groups')
     subparser_define.add_argument(
         '--index-column', dest='index_column', required=False, default='sequence_name',
         help='Taxon column name')
+    subparser_define.add_argument("--subset", dest="subset", required=False, nargs='+',
+                                     help="Names of a subset of groups to define")
 
     subparser_define.set_defaults(func=scorpio.subcommands.define.run)
 
