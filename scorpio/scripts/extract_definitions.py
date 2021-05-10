@@ -60,7 +60,7 @@ def update_var_dict(var_dict, group, variants):
     return
 
 
-def get_common_mutations(var_dict, min_occurance=2, common_threshold=0.98, intermediate_threshold = 0.25):
+def get_common_mutations(var_dict, min_occurance=2, common_threshold=0.98, intermediate_threshold=0.25):
     sorted_tuples = sorted(var_dict.items(), key=operator.itemgetter(1))
     var_dict = {k: v for k, v in sorted_tuples}
 
@@ -138,9 +138,9 @@ def define_mutations(list_variants, feature_dict, reference_seq):
     intermediate_list.sort(key=itemgetter(1))
     current = ["", 1, "", None]
     for new in intermediate_list:
-        print(new, current)
+        #print(new, current)
         if new[1] == current[1] + len(current[0]):
-            print("merge")
+            #print("merge")
             current[0] += new[0]
             current[2] += new[2]
             if new[3] and current[3]:
@@ -175,7 +175,8 @@ def write_constellation(prefix, group, list_variants, list_intermediates):
         json.dump(group_dict, outfile, indent=4)
 
 
-def extract_definitions(in_variants, in_groups, group_column, index_column, reference_json, prefix, subset):
+def extract_definitions(in_variants, in_groups, group_column, index_column, reference_json, prefix, subset,
+                        threshold_common, threshold_intermediate):
     if not in_groups:
         in_groups = in_variants
 
@@ -209,7 +210,7 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
                 print("Index column or variants column not in row", row)
 
     for group in var_dict:
-        common, intermediate = get_common_mutations(var_dict[group])
+        common, intermediate = get_common_mutations(var_dict[group], threshold_common, threshold_intermediate)
         nice_common = define_mutations(common, feature_dict, reference_seq)
         nice_intermediate = define_mutations(intermediate, feature_dict, reference_seq)
         write_constellation(prefix, group, nice_common, nice_intermediate)
@@ -217,7 +218,8 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
 
 def main():
     args = parse_args()
-    extract_definitions(args.in_variants, args.in_groups, args.group_column, args.index_column, args.reference_json, args.prefix, args.subset)
+    extract_definitions(args.in_variants, args.in_groups, args.group_column, args.index_column, args.reference_json,
+                        args.prefix, args.subset, args.threshold_common, args.threshold_intermediate)
 
 
 if __name__ == '__main__':

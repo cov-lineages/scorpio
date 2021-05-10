@@ -125,6 +125,10 @@ def main(sysargs = sys.argv[1:]):
         help='Taxon column name')
     subparser_define.add_argument("--subset", dest="subset", required=False, nargs='+',
                                      help="Names of a subset of groups to define")
+    subparser_define.add_argument("--threshold-common", dest="threshold_common", required=False, type=float,
+                                  default=0.98, help="Frequency of a variant within group to be considered common")
+    subparser_define.add_argument("--threshold-intermediate", dest="threshold_intermediate", required=False, type=float,
+                                  default=0.25, help="Frequency of a variant within group to be reported as intermediate")
 
     subparser_define.set_defaults(func=scorpio.subcommands.define.run)
 

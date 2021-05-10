@@ -10,4 +10,6 @@ def run(options):
                         options.index_column,
                         options.reference_json,
                         options.prefix,
-                        options.subset)
+                        options.subset,
+                        options.threshold_common,
+                        options.threshold_intermediate)
