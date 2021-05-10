@@ -12,4 +12,5 @@ def run(options):
                         options.prefix,
                         options.subset,
                         options.threshold_common,
-                        options.threshold_intermediate)
+                        options.threshold_intermediate,
+                        options.outgroups)

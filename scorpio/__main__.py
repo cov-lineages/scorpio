@@ -134,6 +134,10 @@ def main(sysargs = sys.argv[1:]):
                                   default=0.98, help="Frequency of a variant within group to be considered common")
     subparser_define.add_argument("--threshold-intermediate", dest="threshold_intermediate", required=False, type=float,
                                   default=0.25, help="Frequency of a variant within group to be reported as intermediate")
+    subparser_define.add_argument(
+        '--outgroups', dest='outgroups', required=False,
+        help='Two column CSV with group, and pipe separated list of outgroup sequence_names for that list. '
+             'Assumes outgroups will be in main input CSV')
 
     subparser_define.set_defaults(func=scorpio.subcommands.define.run)
 

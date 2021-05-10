@@ -25,6 +25,32 @@ def parse_args():
     return args
 
 
+def parse_outgroups(outgroup_file):
+    """
+    input is CSV with columns lineage,outgroups. Can include multiple outgroup sequence_names
+    separated by a pipe.
+    Returns a dictionary of outgroup sequence_name : lineage(s) for which it is an outgroup
+    """
+    outgroup_dict = {}
+    if not outgroup_file:
+        return outgroup_dict
+    with open(outgroup_file, "r") as outgroup_handle:
+        line = outgroup_handle.readline()
+        while line:
+            try:
+                lineage, outgroups = line.strip().split(",")
+                outgroups = outgroups.split("|")
+                for outgroup in outgroups:
+                    if outgroup in outgroup_dict:
+                        outgroup_dict[outgroup].append(lineage)
+                    else:
+                        outgroup_dict[outgroup] = [lineage]
+            except:
+                continue
+            line = outgroup_handle.readline()
+    return(outgroup_dict)
+
+
 def get_group_dict(in_variants, group_column, index_column, subset):
     group_dict = {}
     groups = set()
@@ -165,6 +191,12 @@ def define_mutations(list_variants, feature_dict, reference_seq):
     return merged_list
 
 
+def subtract_outgroup(common, outgroup_common):
+    for var in outgroup_common:
+        if var in common:
+            common.remove(var)
+    return common
+
 def write_constellation(prefix, group, list_variants, list_intermediates):
     group_dict = {
         "name": group,
@@ -176,15 +208,18 @@ def write_constellation(prefix, group, list_variants, list_intermediates):
 
 
 def extract_definitions(in_variants, in_groups, group_column, index_column, reference_json, prefix, subset,
-                        threshold_common, threshold_intermediate):
+                        threshold_common, threshold_intermediate, outgroup_file):
     if not in_groups:
         in_groups = in_variants
 
     group_dict = get_group_dict(in_groups, group_column, index_column, subset)
 
+    outgroup_dict = parse_outgroups(outgroup_file)
+
     reference_seq, feature_dict = load_feature_coordinates(reference_json)
 
     var_dict = {}
+    outgroup_var_dict = {}
 
     with open(in_variants, 'r', newline = '') as csv_in:
         reader = csv.DictReader(csv_in, delimiter=",", quotechar='\"', dialect = "unix")
@@ -206,11 +241,17 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
                 group = group_dict[index]
                 variants = row[var_column]
                 update_var_dict(var_dict, group, variants)
+                if index in outgroup_dict:
+                    for lineage in outgroup_dict[index]:
+                        update_var_dict(outgroup_var_dict, lineage, variants)
             else:
                 print("Index column or variants column not in row", row)
 
     for group in var_dict:
         common, intermediate = get_common_mutations(var_dict[group], threshold_common, threshold_intermediate)
+        if group in outgroup_var_dict:
+            outgroup_common, outgroup_intermediate = get_common_mutations(outgroup_var_dict[group], min_occurance=1, common_threshold=0.98)
+            common = subtract_outgroup(common, outgroup_common)
         nice_common = define_mutations(common, feature_dict, reference_seq)
         nice_intermediate = define_mutations(intermediate, feature_dict, reference_seq)
         write_constellation(prefix, group, nice_common, nice_intermediate)
