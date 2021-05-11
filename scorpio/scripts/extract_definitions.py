@@ -86,20 +86,22 @@ def update_var_dict(var_dict, group, variants):
     return
 
 
-def get_common_mutations(var_dict, min_occurance=2, common_threshold=0.98, intermediate_threshold=0.25):
+def get_common_mutations(var_dict, min_occurance=3, threshold_common=0.98, threshold_intermediate=0.25):
     sorted_tuples = sorted(var_dict.items(), key=operator.itemgetter(1))
     var_dict = {k: v for k, v in sorted_tuples}
 
     common = []
     intermediate = []
     for var in var_dict:
+        #print("var", var, var_dict[var], min_occurance, var_dict["total"])
         if var != "total" and var_dict[var] == var_dict["total"]:
             common.append(var)
-        elif var != "total" and var_dict[var] > min_occurance:
+        elif var != "total" and var_dict[var] >= min_occurance:
             frequency = float(var_dict[var])/var_dict["total"]
-            if frequency > common_threshold:
+            #print("var", var, var_dict[var], frequency, threshold_common, threshold_intermediate)
+            if frequency > threshold_common:
                 common.append(var)
-            elif frequency > intermediate_threshold:
+            elif frequency > threshold_intermediate:
                 intermediate.append("%s:%f" % (var, frequency))
     return common, intermediate
 
@@ -137,6 +139,8 @@ def translate_if_possible(nuc_start, nuc_ref, nuc_alt, feature_dict, reference_s
 
 def define_mutations(list_variants, feature_dict, reference_seq):
     merged_list = []
+    if not list_variants:
+        return merged_list
 
     intermediate_list = []
     for variant in list_variants:
@@ -192,17 +196,23 @@ def define_mutations(list_variants, feature_dict, reference_seq):
 
 
 def subtract_outgroup(common, outgroup_common):
-    for var in outgroup_common:
-        if var in common:
-            common.remove(var)
-    return common
+    updated_common = []
+    ancestral = []
+    for var in common:
+        if var in outgroup_common:
+            ancestral.append(var)
+        else:
+            updated_common.append(var)
+    return updated_common, ancestral
 
-def write_constellation(prefix, group, list_variants, list_intermediates):
-    group_dict = {
-        "name": group,
-        "sites": list_variants,
-        "intermediate": list_intermediates,
-    }
+
+def write_constellation(prefix, group, list_variants, list_intermediates, list_ancestral):
+    group_dict = {"name": group, "sites": list_variants, "intermediate": list_intermediates,
+                  "min_alt": int((len(list_variants) + 1) / 4), "max_ref": int((len(list_variants) - 1) / 4)}
+    if list_ancestral:
+        group_dict["ancestral"] = list_ancestral
+        group_dict["min_alt"] += int((len(list_ancestral)+1)/4)
+        group_dict["max_ref"] += int((len(list_ancestral)-1)/4)
     with open('%s/%s.json' % (prefix, group), 'w') as outfile:
         json.dump(group_dict, outfile, indent=4)
 
@@ -215,6 +225,7 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
     group_dict = get_group_dict(in_groups, group_column, index_column, subset)
 
     outgroup_dict = parse_outgroups(outgroup_file)
+    #print(outgroup_dict)
 
     reference_seq, feature_dict = load_feature_coordinates(reference_json)
 
@@ -236,25 +247,30 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
         for row in reader:
             if index_column in row and var_column in row:
                 index = row[index_column]
-                if index not in group_dict:
-                    continue
-                group = group_dict[index]
                 variants = row[var_column]
-                update_var_dict(var_dict, group, variants)
+                if index in group_dict:
+                    group = group_dict[index]
+                    update_var_dict(var_dict, group, variants)
                 if index in outgroup_dict:
                     for lineage in outgroup_dict[index]:
                         update_var_dict(outgroup_var_dict, lineage, variants)
             else:
                 print("Index column or variants column not in row", row)
 
+    #print("outgroup_var_dict", outgroup_var_dict)
+    #print("var_dict", var_dict)
+
     for group in var_dict:
-        common, intermediate = get_common_mutations(var_dict[group], threshold_common, threshold_intermediate)
+        common, intermediate = get_common_mutations(var_dict[group], min_occurance=2, threshold_common=threshold_common, threshold_intermediate=threshold_intermediate)
+        ancestral = None
+        #print("found", common, intermediate)
         if group in outgroup_var_dict:
-            outgroup_common, outgroup_intermediate = get_common_mutations(outgroup_var_dict[group], min_occurance=1, common_threshold=0.98)
-            common = subtract_outgroup(common, outgroup_common)
+            outgroup_common, outgroup_intermediate = get_common_mutations(outgroup_var_dict[group], min_occurance=1, threshold_common=threshold_common, threshold_intermediate=threshold_intermediate)
+            common, ancestral = subtract_outgroup(common, outgroup_common)
         nice_common = define_mutations(common, feature_dict, reference_seq)
         nice_intermediate = define_mutations(intermediate, feature_dict, reference_seq)
-        write_constellation(prefix, group, nice_common, nice_intermediate)
+        nice_ancestral = define_mutations(ancestral, feature_dict, reference_seq)
+        write_constellation(prefix, group, nice_common, nice_intermediate, nice_ancestral)
 
 
 def main():

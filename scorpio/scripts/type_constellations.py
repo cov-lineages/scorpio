@@ -215,7 +215,7 @@ def set_rules(variants, min_alt, max_ref):
     return min_alt, max_ref
 
 
-def parse_json_in(refseq, features_dict, variants_file):
+def parse_json_in(refseq, features_dict, variants_file, include_ancestral=False):
     """
     returns variant_list name and rules
     """
@@ -226,6 +226,11 @@ def parse_json_in(refseq, features_dict, variants_file):
     json_dict = json.load(in_json, strict=False)
     if "sites" in json_dict:
         for site in json_dict["sites"]:
+            record = variant_to_variant_record(site, refseq, features_dict)
+            if record != {}:
+                variant_list.append(record)
+    if include_ancestral and "ancestral" in json_dict:
+        for site in json_dict["ancestral"]:
             record = variant_to_variant_record(site, refseq, features_dict)
             if record != {}:
                 variant_list.append(record)
@@ -310,7 +315,7 @@ def parse_textfile_in(refseq, features_dict, variants_file):
     return variant_list, name
 
 
-def parse_variants_in(refseq, features_dict, variants_file, rule_dict = None):
+def parse_variants_in(refseq, features_dict, variants_file, rule_dict=None, include_ancestral=False):
     """
     read in a variants file and parse its contents and
     return something sensible.
@@ -332,7 +337,7 @@ def parse_variants_in(refseq, features_dict, variants_file, rule_dict = None):
     min_alt, max_ref = None, None
     compulsory = []
     if variants_file.endswith(".json"):
-        variant_list, name, min_alt, max_ref, compulsory = parse_json_in(refseq, features_dict, variants_file)
+        variant_list, name, min_alt, max_ref, compulsory = parse_json_in(refseq, features_dict, variants_file, include_ancestral=include_ancestral)
     elif variants_file.endswith(".csv"):
         variant_list, name, compulsory = parse_csv_in(refseq, features_dict, variants_file)
 
@@ -517,7 +522,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
     constellation_dict = {}
     rule_dict = {}
     for constellation_file in list_constellation_files:
-        constellation, variants, rule_dict = parse_variants_in(reference_seq, features_dict, constellation_file, rule_dict)
+        constellation, variants, rule_dict = parse_variants_in(reference_seq, features_dict, constellation_file, rule_dict, include_ancestral=True)
         if constellation_names and constellation not in constellation_names:
             continue
 
