@@ -196,10 +196,10 @@ def main(sysargs = sys.argv[1:]):
             exit(1)
         if not args.reference_json:
             args.reference_json = reference_json
-            print("Using reference %s" %args.reference_json)
+            print("Found reference %s" %args.reference_json)
         if not args.constellations:
             args.constellations = list_constellation_files
-            print("Using constellations:")
+            print("Found constellations:")
             for c in args.constellations:
                 print(c)
         print("\n")

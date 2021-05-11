@@ -203,15 +203,28 @@ def parse_name_from_file(constellation_file):
     return name
 
 
-def parse_json_in(refseq, features_dict, variants_file, include_ancestral=False):
+def parse_json_in(refseq, features_dict, variants_file, constellation_names=None, include_ancestral=False):
     """
     returns variant_list name and rules
     """
     variant_list = []
-    print("\nParsing constellation JSON file %s" % variants_file)
+    rules = None
 
     in_json = open(variants_file, 'r')
     json_dict = json.load(in_json, strict=False)
+
+    if "label" in json_dict:
+        name = json_dict["label"]
+    elif "name" in json_dict:
+        name = json_dict["name"]
+    else:
+        name = parse_name_from_file(variants_file)
+
+    if constellation_names and name not in constellation_names:
+        return variant_list, name, rules
+
+    print("\nParsing constellation JSON file %s" % variants_file)
+
     if "sites" in json_dict:
         for site in json_dict["sites"]:
             record = variant_to_variant_record(site, refseq, features_dict)
@@ -223,14 +236,6 @@ def parse_json_in(refseq, features_dict, variants_file, include_ancestral=False)
             if record != {}:
                 variant_list.append(record)
 
-    if "label" in json_dict:
-        name = json_dict["label"]
-    elif "name" in json_dict:
-        name = json_dict["name"]
-    else:
-        name = parse_name_from_file(variants_file)
-
-    rules = None
     if "rules" in json_dict:
         rules = json_dict["rules"]
 
@@ -239,15 +244,18 @@ def parse_json_in(refseq, features_dict, variants_file, include_ancestral=False)
     return variant_list, name, rules
 
 
-def parse_csv_in(refseq, features_dict, variants_file):
+def parse_csv_in(refseq, features_dict, variants_file, constellation_names=None):
     """
     returns variant_list and name
     """
     variant_list = []
     compulsory = []
-    print("\nParsing constellation CSV file %s" % variants_file)
 
     name = parse_name_from_file(variants_file)
+    if constellation_names and name not in constellation_names:
+        return variant_list, name, compulsory
+
+    print("\nParsing constellation CSV file %s" % variants_file)
 
     csv_in = open("%s" % variants_file, 'r')
     reader = csv.DictReader(csv_in, delimiter=",")
@@ -282,14 +290,17 @@ def parse_csv_in(refseq, features_dict, variants_file):
     return variant_list, name, rules
 
 
-def parse_textfile_in(refseq, features_dict, variants_file):
+def parse_textfile_in(refseq, features_dict, variants_file, constellation_names=None):
     """
     returns variant_list and name
     """
     variant_list = []
-    print("\nParsing constellation text file %s" % variants_file)
 
     name = parse_name_from_file(variants_file)
+    if constellation_names and name not in constellation_names:
+        return variant_list, name
+
+    print("\nParsing constellation text file %s" % variants_file)
 
     with open("%s" % variants_file, "r") as f:
         for line in f:
@@ -302,7 +313,7 @@ def parse_textfile_in(refseq, features_dict, variants_file):
     return variant_list, name
 
 
-def parse_variants_in(refseq, features_dict, variants_file, include_ancestral=False):
+def parse_variants_in(refseq, features_dict, variants_file, constellation_names=None, include_ancestral=False):
     """
     read in a variants file and parse its contents and
     return something sensible.
@@ -324,12 +335,12 @@ def parse_variants_in(refseq, features_dict, variants_file, include_ancestral=Fa
     rule_dict = None
 
     if variants_file.endswith(".json"):
-        variant_list, name, rule_dict = parse_json_in(refseq, features_dict, variants_file, include_ancestral=include_ancestral)
+        variant_list, name, rule_dict = parse_json_in(refseq, features_dict, variants_file, constellation_names, include_ancestral=include_ancestral)
     elif variants_file.endswith(".csv"):
-        variant_list, name, rule_dict = parse_csv_in(refseq, features_dict, variants_file)
+        variant_list, name, rule_dict = parse_csv_in(refseq, features_dict, variants_file, constellation_names)
 
     if len(variant_list) == 0 and not variants_file.endswith(".json"):
-        variant_list, name = parse_textfile_in(refseq, features_dict, variants_file)
+        variant_list, name = parse_textfile_in(refseq, features_dict, variants_file, constellation_names)
 
     return name, variant_list, rule_dict
 
@@ -493,7 +504,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
     constellation_dict = {}
     for constellation_file in list_constellation_files:
         constellation, variants, ignore = parse_variants_in(reference_seq, features_dict, constellation_file)
-        if constellation_names and constellation not in constellation_names:
+        if not constellation:
             continue
         if len(variants) > 0:
             constellation_dict[constellation] = variants
@@ -542,7 +553,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
     constellation_dict = {}
     rule_dict = {}
     for constellation_file in list_constellation_files:
-        constellation, variants, rules = parse_variants_in(reference_seq, features_dict, constellation_file, include_ancestral=True)
+        constellation, variants, rules = parse_variants_in(reference_seq, features_dict, constellation_file, constellation_names, include_ancestral=True)
         if constellation_names and constellation not in constellation_names:
             continue
         if not rules:

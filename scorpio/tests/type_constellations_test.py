@@ -218,7 +218,7 @@ def test_count_and_classify():
     expect_classify = [False, False, True, False]
     expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "rules": 0, "support": 0.0, "conflict": 0.8333},
                      {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "rules": 0, "support": 0.6667, "conflict": 0.1667},
-                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "rules": 1, "support": 0.8333, "conflict": 0.0},
+                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "rules": 3, "support": 0.8333, "conflict": 0.0},
                      {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "rules": 0, "support": 0.1667, "conflict": 0.0}]
     for i in range(len(seqs)):
         counts, classify = count_and_classify(seqs[i], variants, rules)
