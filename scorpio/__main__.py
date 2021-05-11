@@ -70,6 +70,10 @@ def main(sysargs = sys.argv[1:]):
         "--call-all", dest="call_all", action="store_true",
         help="Allow multiple classifications"
     )
+    subparser_classify.add_argument(
+        "--long", dest="long", action="store_true",
+        help="Write out summary file in long format"
+    )
 
     subparser_classify.set_defaults(func=scorpio.subcommands.classify.run)
 
@@ -202,7 +206,10 @@ def main(sysargs = sys.argv[1:]):
             print("Found constellations:")
             for c in args.constellations:
                 print(c)
-        print("\n")
+            print("\n")
+
+        if args.call_all and args.long:
+            print("Cannot provide long format summary file with multiple calls, ignoring --long\n")
 
     """
     Exit with help menu if no args supplied

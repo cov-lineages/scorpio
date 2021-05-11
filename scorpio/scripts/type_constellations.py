@@ -546,14 +546,15 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
 
 def classify_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json,
-                            output_counts=False, call_all=False):
+                            output_counts=False, call_all=False, long=False):
 
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
     constellation_dict = {}
     rule_dict = {}
     for constellation_file in list_constellation_files:
-        constellation, variants, rules = parse_variants_in(reference_seq, features_dict, constellation_file, constellation_names, include_ancestral=True)
+        constellation, variants, rules = parse_variants_in(reference_seq, features_dict, constellation_file,
+                                                           constellation_names, include_ancestral=True)
         if constellation_names and constellation not in constellation_names:
             continue
         if not rules:
@@ -570,13 +571,18 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             print("%s is not a valid constellation file" % constellation_file)
 
     variants_out = open(out_csv, "w")
-    variants_out.write("query,constellations\n")
+    if long and not call_all:
+        variants_out.write("query,constellations,ref_count,alt_count,ambig_count,other_count,rule_count,support,"
+                           "conflict\n")
+    else:
+        variants_out.write("query,constellations\n")
 
     counts_out = {}
     if output_counts:
         for constellation in constellation_dict:
             counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation), "w")
-            counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,rule_count,support,conflict,call\n")
+            counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,rule_count,support,"
+                                            "conflict,call\n")
 
     with open(in_fasta, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
@@ -589,8 +595,11 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             best_constellation = None
             best_support = 0
             best_conflict = 1
+            best_counts = None
             for constellation in constellation_dict:
-                counts, call = count_and_classify(record.seq, constellation_dict[constellation], rule_dict[constellation])
+                counts, call = count_and_classify(record.seq,
+                                                  constellation_dict[constellation],
+                                                  rule_dict[constellation])
                 if call:
                     if call_all:
                         lineages.append(constellation)
@@ -600,13 +609,21 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                         best_constellation = constellation
                         best_support = counts['support']
                         best_conflict = counts['conflict']
+                        best_counts = counts
                 if output_counts:
                     counts_out[constellation].write(
                         "%s,%i,%i,%i,%i,%i,%f,%f,%s\n" % (record.id, counts['ref'], counts['alt'], counts['ambig'],
-                                                       counts['oth'], counts['rules'], counts['support'], counts['conflict'], call))
+                                                       counts['oth'], counts['rules'], counts['support'],
+                                                          counts['conflict'], call))
             if not call_all and best_constellation:
                 lineages.append(best_constellation)
-            variants_out.write("%s,%s\n" % (record.id, "|".join(lineages)))
+            if long and best_counts:
+                variants_out.write("%s,%s,%i,%i,%i,%i,%i,%f,%f\n" % (record.id, "|".join(lineages), counts['ref'],
+                                                                     counts['alt'], counts['ambig'], counts['oth'],
+                                                                     counts['rules'], counts['support'],
+                                                                     counts['conflict']))
+            else:
+                variants_out.write("%s,%s\n" % (record.id, "|".join(lineages)))
 
     variants_out.close()
     for constellation in counts_out:
