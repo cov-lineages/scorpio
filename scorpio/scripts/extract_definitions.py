@@ -32,6 +32,7 @@ def parse_outgroups(outgroup_file):
     Returns a dictionary of outgroup sequence_name : lineage(s) for which it is an outgroup
     """
     outgroup_dict = {}
+    all_outgroups = set()
     if not outgroup_file:
         return outgroup_dict
     with open(outgroup_file, "r") as outgroup_handle:
@@ -40,6 +41,7 @@ def parse_outgroups(outgroup_file):
             try:
                 lineage, outgroups = line.strip().split(",")
                 outgroups = outgroups.split("|")
+                all_outgroups.update(outgroups)
                 for outgroup in outgroups:
                     if outgroup in outgroup_dict:
                         outgroup_dict[outgroup].append(lineage)
@@ -48,7 +50,7 @@ def parse_outgroups(outgroup_file):
             except:
                 continue
             line = outgroup_handle.readline()
-    return(outgroup_dict)
+    return outgroup_dict, all_outgroups
 
 
 def get_group_dict(in_variants, group_column, index_column, subset):
@@ -222,10 +224,15 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
     if not in_groups:
         in_groups = in_variants
 
-    group_dict = get_group_dict(in_groups, group_column, index_column, subset)
+    outgroup_dict, outgroups = parse_outgroups(outgroup_file)
 
-    outgroup_dict = parse_outgroups(outgroup_file)
-    #print(outgroup_dict)
+    groups_to_get = None
+    if subset:
+        groups_to_get = set()
+        groups_to_get.update(subset)
+        groups_to_get.update(outgroups)
+
+    group_dict = get_group_dict(in_groups, group_column, index_column, groups_to_get)
 
     reference_seq, feature_dict = load_feature_coordinates(reference_json)
 
@@ -250,9 +257,13 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
                 variants = row[var_column]
                 if index in group_dict:
                     group = group_dict[index]
-                    update_var_dict(var_dict, group, variants)
+                    if subset is None or group in subset:
+                        update_var_dict(var_dict, group, variants)
                 if index in outgroup_dict:
                     for lineage in outgroup_dict[index]:
+                        update_var_dict(outgroup_var_dict, lineage, variants)
+                elif index in group_dict and group_dict[index] in outgroup_dict:
+                    for lineage in outgroup_dict[group_dict[index]]:
                         update_var_dict(outgroup_var_dict, lineage, variants)
             else:
                 print("Index column or variants column not in row", row)

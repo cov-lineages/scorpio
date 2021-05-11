@@ -208,7 +208,7 @@ def main(sysargs = sys.argv[1:]):
                 print(c)
             print("\n")
 
-        if args.call_all and args.long:
+        if "call_all" in args and args.call_all and args.long:
             print("Cannot provide long format summary file with multiple calls, ignoring --long\n")
 
     """
