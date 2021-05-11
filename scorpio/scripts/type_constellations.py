@@ -546,7 +546,8 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
         if constellation_names and constellation not in constellation_names:
             continue
         if not rules:
-            print("No rules provided to classify %s" % constellation )
+            print("No rules provided to classify %s" % constellation)
+            continue
         else:
             rule_dict[constellation] = rules
         if len(variants) > 0:
