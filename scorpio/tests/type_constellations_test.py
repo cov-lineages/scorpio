@@ -117,37 +117,28 @@ def test_variant_to_variant_record():
         assert result == expect[i]
 
 
-def test_set_rules():
-    in_pairs = [(None, None), (None, 4), (4, None), (4, 6)]
-    expect_pairs = [(10, 1), (7, 4), (4, 7), (4, 6)]
-    for i in range(len(in_pairs)):
-        result = set_rules(variants_list, in_pairs[i][0], in_pairs[i][1])
-        print(result)
-        assert result == expect_pairs[i]
-
-
 def test_parse_json_in():
     variants_file = "%s/lineage_X.json" % data_dir
-    variant_list, name, min_alt, max_ref, compulsory = parse_json_in(refseq, features_dict, variants_file)
+    variant_list, name, rules = parse_json_in(refseq, features_dict, variants_file)
     assert len(variant_list) == 24
     assert len([v for v in variant_list if v["type"] == "snp"]) == 6
     assert len([v for v in variant_list if v["type"] == "del"]) == 3
     assert len([v for v in variant_list if v["type"] == "aa"]) == 15
     assert name == "Lineage_X"
-    assert min_alt == 4
-    assert max_ref == 6
-    assert compulsory == ["s:E484K"]
+    assert rules["min_alt"] == 4
+    assert rules["max_ref"] == 6
+    assert rules["s:E484K"] == "alt"
 
 
 def test_parse_csv_in():
     variants_file = "%s/lineage_X.csv" % data_dir
-    variant_list, name, compulsory = parse_csv_in(refseq, features_dict, variants_file)
+    variant_list, name, rules = parse_csv_in(refseq, features_dict, variants_file)
     assert len(variant_list) == 24
     assert len([v for v in variant_list if v["type"] == "snp"]) == 6
     assert len([v for v in variant_list if v["type"] == "del"]) == 3
     assert len([v for v in variant_list if v["type"] == "aa"]) == 15
     assert name == "lineage_X"
-    assert compulsory == ["s:E484K"]
+    assert rules["s:E484K"] == "alt"
 
 
 def test_parse_textfile_in():
@@ -163,14 +154,14 @@ def test_parse_textfile_in():
 def test_parse_variants_in():
     in_files = ["%s/lineage_X.json" % data_dir, "%s/lineage_X.csv" % data_dir, "%s/lineage_X.txt" % data_dir]
     expect_names = ["Lineage_X", "lineage_X", "lineage_X"]
-    rule_dict_json = {"Lineage_X": {"min_alt": 4, "max_ref": 6, "compulsory": ["s:E484K"]}}
-    rule_dict_csv = {"lineage_X": {"min_alt": 23, "max_ref": 1, "compulsory": ["s:E484K"]}}
-    rule_dict_txt = {"lineage_X": {"min_alt": 23, "max_ref": 1, "compulsory": []}}
+    rule_dict_json = {"min_alt": 4, "max_ref": 6, "s:E484K": "alt"}
+    rule_dict_csv = {"s:E484K": "alt"}
+    rule_dict_txt = None
     expect_rules = [rule_dict_json, rule_dict_csv, rule_dict_txt]
 
     results = []
     for i in range(len(in_files)):
-        name, variant_list, rule_dict = parse_variants_in(refseq, features_dict, in_files[i], {})
+        name, variant_list, rule_dict = parse_variants_in(refseq, features_dict, in_files[i])
         assert expect_names[i] == name
         assert expect_rules[i] == rule_dict
         results.append(variant_list)
@@ -223,12 +214,12 @@ def test_count_and_classify():
     oth_string = "gaaattcgcccgta-gctcgcaatag"
     seqs = [Seq(ref_string), Seq(alt_string), Seq(alt_plus_string), Seq(oth_string)]
 
-    rules = {"min_alt": 1, "max_ref": 1, "compulsory": ["snp2"]}
+    rules = {"min_alt": 1, "max_ref": 1, "snp2": "alt"}
     expect_classify = [False, False, True, False]
-    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "compulsory": [], "support": 0.0, "conflict": 0.8333},
-                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "compulsory": [], "support": 0.6667, "conflict": 0.1667},
-                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "compulsory": ["snp2"], "support": 0.8333, "conflict": 0.0},
-                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "compulsory": [], "support": 0.1667, "conflict": 0.0}]
+    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "rules": 0, "support": 0.0, "conflict": 0.8333},
+                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "rules": 0, "support": 0.6667, "conflict": 0.1667},
+                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "rules": 1, "support": 0.8333, "conflict": 0.0},
+                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "rules": 0, "support": 0.1667, "conflict": 0.0}]
     for i in range(len(seqs)):
         counts, classify = count_and_classify(seqs[i], variants, rules)
         print(i, counts, classify)

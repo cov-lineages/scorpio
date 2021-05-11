@@ -203,18 +203,6 @@ def parse_name_from_file(constellation_file):
     return name
 
 
-def set_rules(variants, min_alt, max_ref):
-    assert len(variants) > 0
-    if min_alt is None and max_ref is None:
-        min_alt = len([v for v in variants if v["type"] != "ins"]) - 1
-        max_ref = 1
-    elif max_ref is None:
-        max_ref = len([v for v in variants if v["type"] != "ins"]) - min_alt
-    elif min_alt is None:
-        min_alt = len([v for v in variants if v["type"] != "ins"]) - max_ref
-    return min_alt, max_ref
-
-
 def parse_json_in(refseq, features_dict, variants_file, include_ancestral=False):
     """
     returns variant_list name and rules
@@ -242,19 +230,13 @@ def parse_json_in(refseq, features_dict, variants_file, include_ancestral=False)
     else:
         name = parse_name_from_file(variants_file)
 
-    min_alt = None
-    max_ref = None
-    compulsory = []
-    if "min_alt" in json_dict:
-        min_alt = json_dict["min_alt"]
-    if "max_ref" in json_dict:
-        max_ref = json_dict["max_ref"]
-    if "compulsory" in json_dict:
-        compulsory = json_dict["compulsory"]
+    rules = None
+    if "rules" in json_dict:
+        rules = json_dict["rules"]
 
     in_json.close()
 
-    return variant_list, name, min_alt, max_ref, compulsory
+    return variant_list, name, rules
 
 
 def parse_csv_in(refseq, features_dict, variants_file):
@@ -292,7 +274,12 @@ def parse_csv_in(refseq, features_dict, variants_file):
             compulsory.append(record["name"])
 
     csv_in.close()
-    return variant_list, name, compulsory
+    rules = None
+    if len(compulsory) > 0:
+        rules = {}
+        for var in compulsory:
+            rules[var] = "alt"
+    return variant_list, name, rules
 
 
 def parse_textfile_in(refseq, features_dict, variants_file):
@@ -315,7 +302,7 @@ def parse_textfile_in(refseq, features_dict, variants_file):
     return variant_list, name
 
 
-def parse_variants_in(refseq, features_dict, variants_file, rule_dict=None, include_ancestral=False):
+def parse_variants_in(refseq, features_dict, variants_file, include_ancestral=False):
     """
     read in a variants file and parse its contents and
     return something sensible.
@@ -334,19 +321,15 @@ def parse_variants_in(refseq, features_dict, variants_file, rule_dict=None, incl
     one dict per variant. format of subdict varies by variant type
     """
     variant_list = []
-    min_alt, max_ref = None, None
-    compulsory = []
+    rule_dict = None
+
     if variants_file.endswith(".json"):
-        variant_list, name, min_alt, max_ref, compulsory = parse_json_in(refseq, features_dict, variants_file, include_ancestral=include_ancestral)
+        variant_list, name, rule_dict = parse_json_in(refseq, features_dict, variants_file, include_ancestral=include_ancestral)
     elif variants_file.endswith(".csv"):
-        variant_list, name, compulsory = parse_csv_in(refseq, features_dict, variants_file)
+        variant_list, name, rule_dict = parse_csv_in(refseq, features_dict, variants_file)
 
     if len(variant_list) == 0 and not variants_file.endswith(".json"):
         variant_list, name = parse_textfile_in(refseq, features_dict, variants_file)
-
-    if rule_dict is not None and len(variant_list) > 0:
-        min_alt, max_ref = set_rules(variant_list, min_alt, max_ref)
-        rule_dict[name] = {"min_alt": min_alt, "max_ref": max_ref, "compulsory": compulsory}
 
     return name, variant_list, rule_dict
 
@@ -428,23 +411,60 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
     return call, query_allele
 
 
+def var_follows_rules(call, rule):
+    # rules allowed include "ref", "alt", "not ref", "not alt"
+    rule_parts = rule.split()
+    if len(rule_parts) > 1:
+        rule_call = rule_parts[1]
+    else:
+        rule_call = rule
+    if rule_parts[0] == "not":
+        return call != rule_call
+    else:
+        return call == rule_call
+
+def counts_follow_rules(counts, rules):
+    # rules allowed include "max_ref", "min_alt"
+    is_rule_follower = True
+    for rule in rules:
+        if ":" in rule:
+            continue
+        elif str(rule).startswith("min") or str(rule).startswith("max"):
+            rule_parts = rule.split("_")
+            if len(rule_parts) <= 1:
+                continue
+            if rule_parts[0] == "min" and counts[rule_parts[1]] < rules[rule]:
+                is_rule_follower = False
+            elif rule_parts[0] == "max" and counts[rule_parts[1]] > rules[rule]:
+                is_rule_follower = False
+            else:
+                counts["rules"] += 1
+        else:
+            print("Ignoring rule %s:%s" % (rule, str(rules[rule])))
+    return is_rule_follower
+
 def count_and_classify(record_seq, variant_list, rules):
-    counts = {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0, "compulsory": []}
+    assert rules is not None
+    counts = {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0, 'rules':0}
+    is_rule_follower = True
 
     for var in variant_list:
         call, query_allele = call_variant_from_fasta(record_seq, var)
         #print(var, call, query_allele)
         counts[call] += 1
-        if call == "alt" and var["name"] in rules["compulsory"]:
-            counts["compulsory"].append(var["name"])
+        if var["name"] in rules:
+            if var_follows_rules(call, rules[var["name"]]):
+                counts['rules'] += 1
+            elif is_rule_follower:
+                is_rule_follower = False
 
     counts['support'] = round(counts['alt']/float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']),4)
     counts['conflict'] = round(counts['ref'] /float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']),4)
 
-    if counts['alt'] > rules["min_alt"] and counts['ref'] < rules["max_ref"] and len(counts["compulsory"]) == len(rules["compulsory"]):
-        return counts, True
-    else:
+    if not is_rule_follower:
         return counts, False
+    else:
+        return counts, counts_follow_rules(counts, rules)
 
 
 def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_char="X"):
@@ -522,10 +542,13 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
     constellation_dict = {}
     rule_dict = {}
     for constellation_file in list_constellation_files:
-        constellation, variants, rule_dict = parse_variants_in(reference_seq, features_dict, constellation_file, rule_dict, include_ancestral=True)
+        constellation, variants, rules = parse_variants_in(reference_seq, features_dict, constellation_file, include_ancestral=True)
         if constellation_names and constellation not in constellation_names:
             continue
-
+        if not rules:
+            print("No rules provided to classify %s" % constellation )
+        else:
+            rule_dict[constellation] = rules
         if len(variants) > 0:
             constellation_dict[constellation] = variants
             print("Found file %s for constellation %s containing %i variants" % (
@@ -541,7 +564,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
     if output_counts:
         for constellation in constellation_dict:
             counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation), "w")
-            counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,support,conflict,call\n")
+            counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,rule_count,support,conflict,call\n")
 
     with open(in_fasta, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
@@ -567,8 +590,8 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                         best_conflict = counts['conflict']
                 if output_counts:
                     counts_out[constellation].write(
-                        "%s,%i,%i,%i,%i,%f,%f,%s\n" % (record.id, counts['ref'], counts['alt'], counts['ambig'],
-                                                       counts['oth'], counts['support'], counts['conflict'], call))
+                        "%s,%i,%i,%i,%i,%i,%f,%f,%s\n" % (record.id, counts['ref'], counts['alt'], counts['ambig'],
+                                                       counts['oth'], counts['rules'], counts['support'], counts['conflict'], call))
             if not call_all and best_constellation:
                 lineages.append(best_constellation)
             variants_out.write("%s,%s\n" % (record.id, "|".join(lineages)))
