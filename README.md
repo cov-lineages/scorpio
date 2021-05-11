@@ -9,6 +9,7 @@ serious constellations of reoccurring phylogenetically-independent origin
 1. `classify` - takes a set of lineage-defining constellations with rules and classifies sequences by them.
 2. `haplotype` - takes a set of constellations and writes haplotypes (either as strings or individual columns).
 3. `report` - creates a report HTML for a constellation
+4. `define` - takes a CSV with a group column and a mutations column and extracts the common mutations within the group, optionally with reference to a specified outgroup
 
 ### general options
 * `-i`, `--input` - primary input file (usually the FASTA file)
@@ -48,10 +49,16 @@ The JSON file for an individual constellation (in this case a lineage defining o
 		"8:Y73C",
 		"N:D3L",
 		"N:S235F"
-	]
+	],
+        "rules": {
+                "min_alt": 4,
+                "max_ref": 6,
+        }
 }
 ```
 
 The general format of a mutation code is:
 `gene`:[`ref`]`coordinates`[`alt`]
 where `gene` is a gene code (or `nuc` for the genomic nucleotide sequence), `ref` is the nucleotide or amino acids in the reference, `alt` is the specific nucleotide or amino acid for the mutatant. Either of `ref` or `alt` can be missing if no specific state is required.
+
+Rules can either specify [min|max]_[ref|alt|ambig|oth] OR the call required at a mutation e.g. "N:S235F": (not )[ref|alt|ambig|oth]
