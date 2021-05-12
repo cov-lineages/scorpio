@@ -409,7 +409,7 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
                 query_allele = "N"
         elif query_allele == "-" * var["length"]:
             call = 'alt'
-            query_allele = var["length"]
+            query_allele = var["length"]/3
         else:
             call = 'oth'
             if not oth_char:
