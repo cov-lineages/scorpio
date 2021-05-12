@@ -603,7 +603,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                 if call:
                     if call_all:
                         lineages.append(constellation)
-                    elif not best_constellation \
+                    elif (not best_constellation) \
                         or (counts['support'] > best_support) \
                         or (counts['support'] == best_support and counts['conflict'] < best_conflict):
                         best_constellation = constellation
@@ -621,10 +621,10 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             if not call_all and best_constellation:
                 lineages.append(best_constellation)
             if long and best_counts is not None:
-                variants_out.write("%s,%s,%i,%i,%i,%i,%i,%f,%f\n" % (record.id, "|".join(lineages), counts['ref'],
-                                                                     counts['alt'], counts['ambig'], counts['oth'],
-                                                                     counts['rules'], counts['support'],
-                                                                     counts['conflict']))
+                variants_out.write("%s,%s,%i,%i,%i,%i,%i,%f,%f\n" % (record.id, "|".join(lineages), best_counts['ref'],
+                                                                     best_counts['alt'], best_counts['ambig'],
+                                                                     best_counts['oth'], best_counts['rules'],
+                                                                     best_counts['support'], best_counts['conflict']))
             elif long:
                 variants_out.write("%s,%s,,,,,,,\n" % (record.id, "|".join(lineages)))
             else:
