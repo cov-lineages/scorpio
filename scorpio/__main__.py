@@ -180,19 +180,21 @@ def main(sysargs = sys.argv[1:]):
 
     if not args.reference_json or not args.constellations:
         constellations_dir = constellations.__path__[0]
-        data_dir = os.path.join(constellations_dir, "data")
-        print(f"Looking in {data_dir} for data files...")
         reference_json = args.reference_json
         list_constellation_files = []
 
-        for r, d, f in os.walk(data_dir):
-            for fn in f:
-                if fn == "SARS-CoV-2.json":
-                    reference_json = os.path.join(r, fn)
-                elif fn.endswith(".json"):
-                    list_constellation_files.append(os.path.join(r, fn))
-                elif fn.endswith(".csv"):
-                    list_constellation_files.append(os.path.join(r, fn))
+        constellation_subdirs = ["data", "definitions"]
+        for dir in constellation_subdirs:
+            data_dir = os.path.join(constellations_dir, dir)
+            print(f"Looking in {data_dir} for data files...")
+            for r, d, f in os.walk(data_dir):
+                for fn in f:
+                    if fn == "SARS-CoV-2.json":
+                        reference_json = os.path.join(r, fn)
+                    elif fn.endswith(".json"):
+                        list_constellation_files.append(os.path.join(r, fn))
+                    elif fn.endswith(".csv"):
+                        list_constellation_files.append(os.path.join(r, fn))
         if (not args.reference_json and reference_json == "") or (not args.constellations and list_constellation_files == []):
             print(sfunk.cyan(
                 """Please either provide a reference JSON and constellation definition file, or check your environment 

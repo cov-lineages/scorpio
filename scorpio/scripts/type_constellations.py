@@ -605,7 +605,8 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                         lineages.append(constellation)
                     elif (not best_constellation) \
                         or (counts['support'] > best_support) \
-                        or (counts['support'] == best_support and counts['conflict'] < best_conflict):
+                        or (counts['support'] == best_support and counts['conflict'] < best_conflict)\
+                        or (counts['support'] == best_support and counts['conflict'] == best_conflict and counts['rules'] > best_counts["rules"]):
                         best_constellation = constellation
                         best_support = counts['support']
                         best_conflict = counts['conflict']
