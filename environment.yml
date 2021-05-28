@@ -6,12 +6,12 @@ channels:
   - defaults
 dependencies:
   - wget
-  - biopython=1.74
+  - biopython
   - minimap2
-  - pip=19.3.1
-  - python=3.7
-  - snakemake-minimal=5.13
-  - libpysal=4.3.0
+  - pip
+  - python>=3.6
+  - snakemake-minimal
+  - libpysal
   - gofasta
   - pip:
     - git+https://github.com/cov-ert/reportfunk.git
