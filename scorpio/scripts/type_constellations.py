@@ -33,20 +33,27 @@ def load_feature_coordinates(reference_json):
         sys.exit(1)
 
     features_dict = {}
-    for feature in ["genes"]:  # , "proteins", "features"]:
+    for feature in ["genes", "proteins"]:  #, "features"]:
         if feature in json_dict:
             for item in json_dict[feature]:
                 name = item.lower()
                 if "name" in json_dict[feature][item]:
                     name = json_dict[feature][item]["name"].lower()
+                if name in features_dict:
+                    continue
 
                 if "coordinates" in json_dict[feature][item]:
                     if "from" in json_dict[feature][item]["coordinates"]:
-                        features_dict[name] = (json_dict[feature][item]["coordinates"]["from"],
-                                                       json_dict[feature][item]["coordinates"]["to"])
+                        start = int(json_dict[feature][item]["coordinates"]["from"])
+                        end = int(json_dict[feature][item]["coordinates"]["to"])
                     elif "start" in json_dict[feature][item]["coordinates"]:
-                        features_dict[name] = (json_dict[feature][item]["coordinates"]["start"],
-                                                       json_dict[feature][item]["coordinates"]["end"])
+                        start = int(json_dict[feature][item]["coordinates"]["start"])
+                        end = int(json_dict[feature][item]["coordinates"]["end"])
+
+                    if "gene" in json_dict[feature][item]:
+                        features_dict[name] = (start, end, json_dict[feature][item]["gene"])
+                    else:
+                        features_dict[name] = (start, end)
                     print("Found reference feature %s with coordinates" % name, features_dict[name])
     if len(features_dict) == 0:
         sys.stderr.write("No features (keys \"genes\", \"proteins\" or \"features\" ) provided in JSON %s " %
@@ -61,6 +68,8 @@ def resolve_ambiguous_cds(cds, aa_pos, features_dict):
     cds = cds.lower()
 
     if cds in features_dict:
+        if len(features_dict[cds]) == 3:
+            cds, aa_pos = resolve_ambiguous_cds(features_dict[cds][2], features_dict[cds][0]+aa_pos-1, features_dict)
         return cds, aa_pos
 
     if cds in global_aliases and global_aliases[cds] in features_dict:
@@ -120,6 +129,7 @@ def variant_to_variant_record(l, refseq, features_dict):
 
     to a dict
     """
+    #print("Parsing variant %s" %l)
     lsplit = l.split(":")
     info = {}
 
