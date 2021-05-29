@@ -47,6 +47,8 @@ snp1 = {"name": "snp1", "type": "snp", "ref_start": 10, "ref_allele": "T", "alt_
 snp2 = {"name": "snp2", "type": "snp", "ref_start": 1, "ref_allele": "A", "alt_allele": "T"}
 del1 = {"name": "del1", "type": "del", "ref_start": 15, "ref_allele": "AG", "alt_allele": "", "length": 2}
 ins1 = {"name": "ins1", "type": "ins", "ref_start": 17, "ref_allele": "", "alt_allele": "AAC"}
+del1a = {"name": "del1", "type": "del", "ref_start": 15, "ref_allele": "AAAAAG", "alt_allele": "", "length": 6}
+ins1a = {"name": "ins1", "type": "ins", "ref_start": 21, "ref_allele": "", "alt_allele": "AAC"}
 
 def test_load_feature_coordinates():
         result = features_dict
@@ -62,7 +64,24 @@ def test_load_feature_coordinates():
                 "orf7a":   (27394, 27759),
                 "orf8":    (27894, 28259),
                 "n":       (28274, 29533),
-                "orf10" :  (29558, 29674)}
+                "orf10":  (29558, 29674),
+                'nsp1': (1, 180),
+                'nsp2': (181, 818),
+                'nsp3': (819, 2763),
+                'nsp4': (2764, 3263),
+                'nsp5': (3264, 3569),
+                'nsp6': (3570, 3859),
+                'nsp7': (3860, 3942),
+                'nsp8': (3943, 4140),
+                'nsp9': (4141, 4253),
+                'nsp10': (4254, 4392),
+                'nsp11': (4392, 4392),
+                'nsp12': (4393, 5324),
+                'nsp13': (5325, 5925),
+                'nsp14': (5926, 6452),
+                'nsp15': (6453, 6798),
+                'nsp16': (6799, 7096)
+        }
         assert result == expect
 
 def test_resolve_ambiguous_cds():
@@ -169,12 +188,12 @@ def test_parse_variants_in():
 
 
 def test_call_variant_from_fasta():
-    variants = [aa1, aa2, snp1, del1]
+    variants = [aa1, aa2, snp1, del1a]
 
-    ref_string = "aaaattagctcgtaagctcgcaatag"
-    alt_string = "aaaatcagcacgta--ctcgcaatag"
-    ambig_string = "nnnnnnnnnnnnnnnnnnnnnnnnnnnn"
-    oth_string = "aaaattcgcccgta-gctcgcaatag"
+    ref_string = "aaaattagctcgtaaaaaagctcgcaatag"
+    alt_string = "aaaatcagcacgta------ctcgcaatag"
+    ambig_string = "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+    oth_string = "aaaattcgcccgta---aagctcgcaatag"
 
     for var in variants:
         call, query_allele = call_variant_from_fasta(Seq(ref_string), var)
@@ -184,7 +203,7 @@ def test_call_variant_from_fasta():
     for var in variants:
         call, query_allele = call_variant_from_fasta(Seq(alt_string), var)
         assert call == "alt"
-        assert query_allele == var["alt_allele"] or (var["type"] == 'del' and query_allele == var["length"]) or (var["fuzzy"] and query_allele != var["ref_allele"])
+        assert query_allele == var["alt_allele"] or (var["type"] == 'del' and query_allele == int(var["length"]/3)) or ("fuzzy" in var and var["fuzzy"] and query_allele != var["ref_allele"])
 
     for var in variants:
         call, query_allele = call_variant_from_fasta(Seq(ambig_string), var)
@@ -227,12 +246,12 @@ def test_count_and_classify():
         assert counts == expect_counts[i]
 
 def test_generate_barcode():
-    variants = [aa1, aa2, snp1, snp2, del1, ins1]
+    variants = [aa1, aa2, snp1, snp2, del1a, ins1a]
 
-    ref_string = "aaaattagctcgtaagctcgcaatag"
-    alt_string = "aaaatcagcacgta--ctcgcaatag"
-    alt_plus_string = "taaatcagcacgta--ctcgcaatag"
-    oth_string = "gaaattcgcccgta-gctcgcaatag"
+    ref_string = "aaaattagctcgtaaaaaagctcgcaatag"
+    alt_string = "aaaatcagcacgta------ctcgcaatag"
+    alt_plus_string = "taaatcagcacgta------ctcgcaatag"
+    oth_string = "gaaattcgcccgta---aagctcgcaatag"
     seqs = [Seq(ref_string), Seq(alt_string), Seq(alt_plus_string), Seq(oth_string)]
 
     expect_barcode_dash = ["-----?", "SSA-2?", "SSAT2?", "XFXXX?"]

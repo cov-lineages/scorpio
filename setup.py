@@ -9,9 +9,8 @@ from scorpio import __version__, _program
 setup(name='scorpio',
       version=__version__,
       packages=find_packages(),
-      scripts=["scorpio/scripts/scorpiofunks.py",
-               "scorpio/scripts/type_constellations.py"],
-      package_data={"scorpio":["data/*"]},
+      scripts=["scorpio/scripts/type_constellations.py",
+               "scorpio/scripts/extract_definitions.py"],
       install_requires=[
             "biopython>=1.70",
             "pytools>=2020.1",
@@ -28,15 +27,14 @@ setup(name='scorpio',
             "seaborn>=0.10.1",
             "epiweeks>=2.1.2"
         ],
-
       description='serious constellations of reoccurring phylogenetically-independent origin',
       url='https://github.com/cov-lineages/scorpio',
-      author='Ben Jackson & Rambaut Group',
-      author_email='bjackso4@ed.ac.uk',
+      author='Rachel Colquhoun, Ben Jackson & Rambaut Group',
+      author_email='rachel.colquhoun@ed.ac.uk',
       entry_points="""
       [console_scripts]
       {program} = scorpio.__main__:main
-      """.format(program = _program),
+      """.format(program=_program),
       include_package_data=True,
       keywords=[],
       zip_safe=False)

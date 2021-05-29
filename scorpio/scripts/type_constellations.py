@@ -39,7 +39,7 @@ def load_feature_coordinates(reference_json):
                 name = item.lower()
                 if "name" in json_dict[feature][item]:
                     name = json_dict[feature][item]["name"].lower()
-                if name in features_dict:
+                if name in features_dict or name in global_aliases and global_aliases[name] in features_dict:
                     continue
 
                 if "coordinates" in json_dict[feature][item]:
@@ -136,7 +136,7 @@ def variant_to_variant_record(l, refseq, features_dict):
     if "+" in l:
         m = re.match(r'[aa:]*(?P<cds>\w+):(?P<pos>\d+)\+(?P<alt_allele>[a-zA-Z]+)', l)
         if not m:
-            sys.stderr.write("couldn't parse the following string: %s\n" % l)
+            sys.stderr.write("Warning: couldn't parse the following string: %s - ignoring\n" % l)
             sys.exit(1)
         info = m.groupdict()
         info["type"] = "ins"
@@ -172,7 +172,7 @@ def variant_to_variant_record(l, refseq, features_dict):
     else:
         m = re.match(r'[aa:]*(?P<cds>\w+):(?P<ref_allele>[a-zA-Z-*]+)(?P<aa_pos>\d+)(?P<alt_allele>[a-zA-Z-*]*)', l)
         if not m:
-            sys.stderr.write("couldn't parse the following string: %s\n" % l)
+            sys.stderr.write("Warning: couldn't parse the following string: %s - ignoring\n" % l)
             # sys.exit(1)
             return info
 
@@ -277,7 +277,7 @@ def parse_csv_in(refseq, features_dict, variants_file, constellation_names=None)
 
         if "id" not in reader.fieldnames:
             csv_in.close()
-            print("CSV headerline does not contain 'id': %s" % reader.fieldnames)
+            print("Warning: CSV headerline does not contain 'id': %s - ignoring" % reader.fieldnames)
             return variant_list, name, compulsory
 
     for row in reader:
@@ -419,7 +419,7 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
                 query_allele = "N"
         elif query_allele == "-" * var["length"]:
             call = 'alt'
-            query_allele = var["length"]/3
+            query_allele = int(var["length"]/3)
         else:
             call = 'oth'
             if not oth_char:
@@ -461,7 +461,7 @@ def counts_follow_rules(counts, rules):
             else:
                 counts["rules"] += 1
         else:
-            print("Ignoring rule %s:%s" % (rule, str(rules[rule])))
+            print("Warning: Ignoring rule %s:%s" % (rule, str(rules[rule])))
     return is_rule_follower
 
 def count_and_classify(record_seq, variant_list, rules):
@@ -521,7 +521,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
             print("Found file %s for constellation %s containing %i variants" % (
                     constellation_file, constellation, len([v["name"] for v in variants])))
         else:
-            print("%s is not a valid constellation file" % constellation_file)
+            print("Warning: %s is not a valid constellation file - ignoring" % constellation_file)
 
     variants_out = open(out_csv, "w")
     variants_out.write("query,%s\n" % ",".join(list(constellation_dict.keys())))
@@ -568,7 +568,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
         if constellation_names and constellation not in constellation_names:
             continue
         if not rules:
-            print("No rules provided to classify %s" % constellation)
+            print("Warning: No rules provided to classify %s - ignoring" % constellation)
             continue
         else:
             rule_dict[constellation] = rules
@@ -578,7 +578,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             constellation_file, constellation, len([v["name"] for v in variants])))
             print("Rules", rule_dict[constellation])
         else:
-            print("%s is not a valid constellation file" % constellation_file)
+            print("Warning: %s is not a valid constellation file - ignoring" % constellation_file)
 
     variants_out = open(out_csv, "w")
     if long and not call_all:

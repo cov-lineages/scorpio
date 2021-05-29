@@ -7,7 +7,7 @@ import json
 from Bio.Seq import Seq
 from operator import itemgetter
 
-from type_constellations import load_feature_coordinates
+from .type_constellations import load_feature_coordinates
 
 def parse_args():
     parser = argparse.ArgumentParser(description="""Pick a representative sample for each unique sequence""",
