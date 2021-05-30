@@ -7,14 +7,7 @@ channels:
 dependencies:
   - wget
   - biopython>=1.74
-  - minimap2
   - pip
   - python>=3.6
-  - snakemake-minimal
-  - libpysal
-  - gofasta
   - pip:
-    - git+https://github.com/cov-ert/reportfunk.git
-    - git+https://github.com/cov-ert/fastafunk.git
-    - git+https://github.com/cov-ert/datafunk.git
     - git+https://github.com/cov-lineages/constellations.git
