@@ -590,7 +590,8 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
     counts_out = {}
     if output_counts:
         for constellation in constellation_dict:
-            counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation), "w")
+            clean_name = re.sub("[^a-zA-Z0-9_\-.]","_",constellation)
+            counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), clean_name), "w")
             counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,rule_count,support,"
                                             "conflict,call\n")
 
