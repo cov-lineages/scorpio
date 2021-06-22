@@ -218,13 +218,15 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
     returns variant_list name and rules
     """
     variant_list = []
+    name = None
     rules = None
 
     in_json = open(variants_file, 'r')
     json_dict = json.load(in_json, strict=False)
 
-    if label and "type" in json_dict and json_dict["type"] in json_dict and label in json_dict[json_dict["type"]]:
-        name = json_dict[json_dict["type"]][label]
+    if label:
+        if "type" in json_dict and json_dict["type"] in json_dict and label in json_dict[json_dict["type"]]:
+            name = json_dict[json_dict["type"]][label]
     elif "label" in json_dict:
         name = json_dict["label"]
     elif "name" in json_dict:
@@ -232,6 +234,8 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
     else:
         name = parse_name_from_file(variants_file)
 
+    if not name:
+        return variant_list, name, rules
     if constellation_names and name not in constellation_names:
         return variant_list, name, rules
 
