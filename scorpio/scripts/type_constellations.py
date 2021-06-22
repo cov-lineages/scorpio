@@ -150,19 +150,20 @@ def variant_to_variant_record(l, refseq, features_dict):
             info["name"] = l
         print("Warning: found variant of type insertion, which will be ignored during typing")
     elif lsplit[0] in ["snp", "nuc"]:
-        type = "snp"
-        ref_allele = lsplit[1][0]
-        ref_start = int(lsplit[1][1:-1])
-        alt_allele = lsplit[1][-1]
-        ref_allele_check = refseq[ref_start - 1]
+        info = {"name": l, "type": "snp"}
+        m = re.match(r'(?P<ref_allele>[ACGT]+)(?P<ref_start>\d+)(?P<alt_allele>[AGCT]*)', l[4:])
+        if not m:
+            sys.stderr.write("Warning: couldn't parse the following string: %s - ignoring\n" % l)
+            sys.exit(1)
+        info.update(m.groupdict())
+        info["ref_start"] = int(info["ref_start"])
+        ref_allele_check = refseq[info["ref_start"] - 1]
 
-        if ref_allele != '?' and ref_allele != ref_allele_check:
+        if info["ref_allele"] != '?' and info["ref_allele"] != ref_allele_check:
             sys.stderr.write(
                 "variants file says reference nucleotide at position %d is %s, but reference sequence has %s, "
-                "context %s\n" % (ref_start, ref_allele, ref_allele_check, refseq[ref_start - 4:ref_start + 3]))
+                "context %s\n" % (info["ref_start"], info["ref_allele"], ref_allele_check, refseq[info["ref_start"] - 4:info["ref_start"] + 3]))
             sys.exit(1)
-
-        info = {"name": l, "type": type, "ref_start": ref_start, "ref_allele": ref_allele, "alt_allele": alt_allele}
 
     elif lsplit[0] == "del":
         length = int(lsplit[2])
@@ -379,7 +380,7 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
             call = 'ref'
         elif query_allele == "N":
             call = 'ambig'
-        elif query_allele == var["alt_allele"]:
+        elif query_allele == var["alt_allele"] or var["alt_allele"] == "":
             call = 'alt'
         else:
             call = 'oth'
