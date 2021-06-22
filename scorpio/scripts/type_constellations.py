@@ -168,7 +168,7 @@ def variant_to_variant_record(l, refseq, features_dict):
     elif lsplit[0] == "del":
         length = int(lsplit[2])
         info = {"name": l, "type": lsplit[0], "ref_start": int(lsplit[1]), "length": length,
-                "ref_allele": refseq[int(lsplit[1]) - 1:int(lsplit[1]) + length - 1]}
+                "ref_allele": refseq[int(lsplit[1]) - 1:int(lsplit[1]) + length - 1], "space": "nuc"}
 
     else:
         m = re.match(r'[aa:]*(?P<cds>\w+):(?P<ref_allele>[a-zA-Z-*]+)(?P<aa_pos>\d+)(?P<alt_allele>[a-zA-Z-*]*)', l)
@@ -197,8 +197,9 @@ def variant_to_variant_record(l, refseq, features_dict):
         info["ref_start"] = ref_start
         if info["alt_allele"] in ['del', '-']:
             info["type"] = "del"
-            info["length"] = 3*len(info["ref_allele"])
-            info["ref_allele"] = str(ref_allele)
+            info["space"] = "aa"
+            info["length"] = len(info["ref_allele"])
+            info["after"] = str(Seq(refseq[ref_start - 1 + 3*info["length"]:ref_start - 1 + 3*info["length"]+3]).translate())
         elif info["alt_allele"] == '':
             info["fuzzy"] = True
         else:
@@ -408,14 +409,31 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
             call = 'oth'
         #print(call, query_allele)
 
-    elif var["type"] == "del":
+    elif var["type"] == "del" and var["space"] == "aa":
+        query_allele = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + 3*var["length"] + 2]
+        query_allele = query_allele.replace("-","")
+        query_allele = query_allele.translate()
+        #print("call for del in aa space with ref %s, after %s, length %d and query_allele %s" %(var["ref_allele"], var["after"], var["length"], query_allele))
+        if query_allele == var["ref_allele"]+var["after"]:
+            call = 'ref'
+            query_allele = 0
+        elif query_allele == var["after"]:
+            call = 'alt'
+            query_allele = var["length"]
+        elif "X" in query_allele:
+            call = 'ambig'
+            if not oth_char:
+                query_allele = "X"
+            else:
+                query_allele = "N"
+        else:
+            call = 'oth'
+            if not oth_char:
+                query_allele = "X"
+    elif var["type"] == "del" and var["space"] == "nuc":
         query_allele = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + var["length"] - 1]
-        #print("del allele", query_allele)
-        #query_allele_minus = record_seq.upper()[var["ref_start"] - 2:var["ref_start"] + var["length"] - 2]
-        #query_allele_plus = record_seq.upper()[var["ref_start"]:var["ref_start"] + var["length"]]
-        #print("Found", query_allele, query_allele_minus, query_allele_plus)
-        #print(var["ref_allele"], query_allele == var["ref_allele"], var["alt_allele"],
-        #      query_allele == var["alt_allele"])
+        #print("call for del in nuc space with ref %s, length %d and query_allele %s" %(var["ref_allele"], var["length"], query_allele))
+
         if query_allele == var["ref_allele"]:
             call = 'ref'
             query_allele = 0
@@ -427,7 +445,7 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
                 query_allele = "N"
         elif query_allele == "-" * var["length"]:
             call = 'alt'
-            query_allele = int(var["length"]/3)
+            query_allele = int(var["length"] / 3)
         else:
             call = 'oth'
             if not oth_char:
