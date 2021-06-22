@@ -151,7 +151,7 @@ def variant_to_variant_record(l, refseq, features_dict):
         print("Warning: found variant of type insertion, which will be ignored during typing")
     elif lsplit[0] in ["snp", "nuc"]:
         info = {"name": l, "type": "snp"}
-        m = re.match(r'(?P<ref_allele>[ACGT]+)(?P<ref_start>\d+)(?P<alt_allele>[AGCT]*)', l[4:])
+        m = re.match(r'(?P<ref_allele>[ACGTUN]+)(?P<ref_start>\d+)(?P<alt_allele>[AGCTUN]*)', l[4:])
         if not m:
             sys.stderr.write("Warning: couldn't parse the following string: %s - ignoring\n" % l)
             sys.exit(1)
@@ -362,7 +362,7 @@ def parse_variants_in(refseq, features_dict, variants_file, constellation_names=
     return name, variant_list, rule_dict
 
 
-def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
+def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=False):
     #print("Call variant for ", var)
     call = None
     query_allele = None
@@ -388,7 +388,8 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None):
 
     elif var["type"] == "aa":
         try:
-            query_allele = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + 2].translate()
+            query = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + 2]
+            query_allele = query.translate()
             #query_allele_minus = record_seq.upper()[var["ref_start"] - 2:var["ref_start"] + 1].translate()
             #query_allele_plus = record_seq.upper()[var["ref_start"]:var["ref_start"] + 3].translate()
             #print("Found", query_allele, query_allele_minus, query_allele_plus)
