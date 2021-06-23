@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import csv
 import operator
 import argparse
@@ -34,7 +35,7 @@ def parse_outgroups(outgroup_file):
     outgroup_dict = {}
     all_outgroups = set()
     if not outgroup_file:
-        return outgroup_dict
+        return outgroup_dict, all_outgroups
     with open(outgroup_file, "r") as outgroup_handle:
         line = outgroup_handle.readline()
         while line:
@@ -250,6 +251,7 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
             var_column = "nucleotide_mutations"
         else:
             print("No nucleotide_variants or nucleotide_mutations columns found")
+            sys.exit(-1)
 
         for row in reader:
             if index_column in row and var_column in row:

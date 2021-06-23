@@ -206,7 +206,7 @@ def main(sysargs = sys.argv[1:]):
             print(sfunk.cyan(
                 """Please either provide a reference JSON and constellation definition file, or check your environment 
                 to make sure that constellations has been properly installed."""))
-            exit(1)
+            sys.exit(-1)
         if not args.reference_json:
             args.reference_json = reference_json
             print("Found reference %s" %args.reference_json)
