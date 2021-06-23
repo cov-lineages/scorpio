@@ -389,7 +389,7 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
 
     elif var["type"] == "aa":
         try:
-            query = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + 2]
+            query = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] - 1 + 3 * len(var["ref_allele"])]
             query_allele = query.translate()
             #query_allele_minus = record_seq.upper()[var["ref_start"] - 2:var["ref_start"] + 1].translate()
             #query_allele_plus = record_seq.upper()[var["ref_start"]:var["ref_start"] + 3].translate()
@@ -412,6 +412,8 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
     elif var["type"] == "del" and var["space"] == "aa":
         query_allele = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + 3*var["length"] + 2]
         query_allele = query_allele.replace("-","")
+        while len(query_allele) % 3 != 0:
+            query_allele += "N"
         query_allele = query_allele.translate()
         #print("call for del in aa space with ref %s, after %s, length %d and query_allele %s" %(var["ref_allele"], var["after"], var["length"], query_allele))
         if query_allele == var["ref_allele"]+var["after"]:
@@ -555,7 +557,8 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
     counts_out = {}
     if output_counts:
         for constellation in constellation_dict:
-            counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), constellation), "w")
+            clean_name = re.sub("[^a-zA-Z0-9_\-.]", "_", constellation)
+            counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), clean_name), "w")
             counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,support,conflict\n")
 
     with open(in_fasta, "r") as f:
