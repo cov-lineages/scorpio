@@ -422,7 +422,7 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
 
     elif var["type"] == "del" and var["space"] == "aa":
         query_allele = record_seq.upper()[var["ref_start"] - 4:var["ref_start"] + 3*var["length"] + 2]
-        query = query_allele.replace("-","")
+        query = str(query_allele).replace("-","")
         if len(query) % 3 != 0:
             query = query.replace("N","")
         if len(query) % 3 != 0:
@@ -432,7 +432,7 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
         query_allele = query
         while len(query_allele) % 3 != 0:
             query_allele += "N"
-        query_allele = query_allele.translate()
+        query_allele = Seq(query_allele).translate()
         #print("call for del in aa space with before %s, ref %s, after %s, length %d and query_allele %s" %(var["before"], var["ref_allele"], var["after"], var["length"], query_allele))
         if query_allele == var["before"] + var["ref_allele"] + var["after"]:
             call = 'ref'
