@@ -42,6 +42,11 @@ def main(sysargs = sys.argv[1:]):
                                      help="One or more JSON (or CSV) files specifying variants")
     constellation_group.add_argument("-n", "--names", dest="names", required=False, nargs='+',
                                      help="Names of constellations to include")
+    constellation_group.add_argument("-l", "--label", dest="label", required=False,
+                                     help="Use alternative label specified in JSON where possible")
+    constellation_group.add_argument('--pangolin', dest='pangolin', action='store_true',
+                                    help='Uses `mrca_lineage` as label and excludes constellations/data directory for'
+                                         ' robustness')
 
     misc_group = common.add_argument_group('Misc options')
     misc_group.add_argument('--tempdir', action="store",
@@ -191,9 +196,11 @@ def main(sysargs = sys.argv[1:]):
                 for fn in f:
                     if fn == "SARS-CoV-2.json":
                         reference_json = os.path.join(r, fn)
-                    elif fn.endswith(".json"):
+                    elif args.pangolin and r.endswith('definitions') and fn.endswith(".json"):
                         list_constellation_files.append(os.path.join(r, fn))
-                    elif fn.endswith(".csv"):
+                    elif not args.pangolin and fn.endswith(".json"):
+                        list_constellation_files.append(os.path.join(r, fn))
+                    elif not args.pangolin and fn.endswith(".csv"):
                         list_constellation_files.append(os.path.join(r, fn))
         if (not args.reference_json and reference_json == "") or (not args.constellations and list_constellation_files == []):
             print(sfunk.cyan(

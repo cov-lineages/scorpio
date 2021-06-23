@@ -11,4 +11,5 @@ def run(options):
                         options.reference_json,
                         options.output_counts,
                         options.call_all,
-                        options.long)
+                        options.long,
+                        options.label)

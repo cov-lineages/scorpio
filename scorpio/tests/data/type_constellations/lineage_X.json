@@ -1,5 +1,9 @@
 {
 	"name": "Lineage_X",
+	"type": "variant",
+	"variant": {
+		"mrca_lineage": "B.1.1.7"
+	},
 	"sites": [
 		"nuc:C912T",
 		"1ab:T1001I",

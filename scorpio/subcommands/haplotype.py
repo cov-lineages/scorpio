@@ -10,4 +10,5 @@ def run(options):
                         options.output,
                         options.reference_json,
                         options.ref_char,
-                        options.output_counts)
+                        options.output_counts,
+                        options.label)
