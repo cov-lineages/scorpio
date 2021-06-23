@@ -229,7 +229,12 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
     json_dict = json.load(in_json, strict=False)
 
     if "type" in json_dict and json_dict["type"] in json_dict and "mrca_lineage" in json_dict[json_dict["type"]]:
-        mrca_lineage = json_dict[json_dict["type"]]["mrca_lineage"]
+        m = re.match(r'[A-Z0-9.]*', json_dict[json_dict["type"]]["mrca_lineage"])
+        if not m:
+            sys.stderr.write("Warning: mrca_lineage %s not in acceptable format - ignoring\n" % json_dict[json_dict["type"]]["mrca_lineage"])
+        else:
+            mrca_lineage = json_dict[json_dict["type"]]["mrca_lineage"]
+
 
     if label:
         if "type" in json_dict and json_dict["type"] in json_dict and label in json_dict[json_dict["type"]]:
