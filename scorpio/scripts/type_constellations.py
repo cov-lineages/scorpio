@@ -421,8 +421,8 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
         #print(call, query_allele)
 
     elif var["type"] == "del" and var["space"] == "aa":
-        query_allele = record_seq.upper()[var["ref_start"] - 4:var["ref_start"] + 3*var["length"] + 2]
-        query = str(query_allele).replace("-","")
+        query_allele = str(record_seq.upper()[var["ref_start"] - 4:var["ref_start"] + 3*var["length"] + 2])
+        query = query_allele.replace("-","")
         if len(query) % 3 != 0:
             query = query.replace("N","")
         if len(query) % 3 != 0:
