@@ -426,7 +426,7 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
         if len(query) % 3 != 0:
             query = query.replace("N","")
         if len(query) % 3 != 0:
-            query = query_allele.replace("-","N")
+            query = str(query_allele).replace("-","N")
         if len(query) % 3 != 0:
             print("Warning: while typing variant %s (before,ref,after) = (%s,%s,%s) found sequence with query allele %s treated as %s. Handling by adding Ns which will result in ambiguous calls" %(var["name"], var["before"], var["ref_allele"], var["after"], query_allele, query))
         query_allele = query
