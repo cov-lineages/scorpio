@@ -216,8 +216,6 @@ def main(sysargs = sys.argv[1:]):
             for c in args.constellations:
                 print(c)
             print("\n")
-        if not args.label and args.pangolin:
-            args.label = "mrca_lineage"
 
         if "call_all" in args and args.call_all and args.long:
             print("Cannot provide long format summary file with multiple calls, ignoring --long\n")

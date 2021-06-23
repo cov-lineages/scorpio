@@ -199,6 +199,7 @@ def variant_to_variant_record(l, refseq, features_dict):
             info["type"] = "del"
             info["space"] = "aa"
             info["length"] = len(info["ref_allele"])
+            info["before"] = str(Seq(refseq[ref_start - 4:ref_start - 1]).translate())
             info["after"] = str(Seq(refseq[ref_start - 1 + 3*info["length"]:ref_start - 1 + 3*info["length"]+3]).translate())
         elif info["alt_allele"] == '':
             info["fuzzy"] = True
@@ -222,9 +223,13 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
     variant_list = []
     name = None
     rules = None
+    mrca_lineage = ""
 
     in_json = open(variants_file, 'r')
     json_dict = json.load(in_json, strict=False)
+
+    if "type" in json_dict and json_dict["type"] in json_dict and "mrca_lineage" in json_dict[json_dict["type"]]:
+        mrca_lineage = json_dict[json_dict["type"]]["mrca_lineage"]
 
     if label:
         if "type" in json_dict and json_dict["type"] in json_dict and label in json_dict[json_dict["type"]]:
@@ -237,9 +242,9 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
         name = parse_name_from_file(variants_file)
 
     if not name:
-        return variant_list, name, rules
+        return variant_list, name, rules, mrca_lineage
     if constellation_names and name not in constellation_names:
-        return variant_list, name, rules
+        return variant_list, name, rules, mrca_lineage
 
     print("\nParsing constellation JSON file %s" % variants_file)
 
@@ -259,7 +264,7 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
 
     in_json.close()
 
-    return variant_list, name, rules
+    return variant_list, name, rules, mrca_lineage
 
 
 def parse_csv_in(refseq, features_dict, variants_file, constellation_names=None):
@@ -351,16 +356,17 @@ def parse_variants_in(refseq, features_dict, variants_file, constellation_names=
     """
     variant_list = []
     rule_dict = None
+    mrca_lineage = ""
 
     if variants_file.endswith(".json"):
-        variant_list, name, rule_dict = parse_json_in(refseq, features_dict, variants_file, constellation_names, include_ancestral=include_ancestral,label=label)
+        variant_list, name, rule_dict, mrca_lineage = parse_json_in(refseq, features_dict, variants_file, constellation_names, include_ancestral=include_ancestral,label=label)
     elif variants_file.endswith(".csv"):
         variant_list, name, rule_dict = parse_csv_in(refseq, features_dict, variants_file, constellation_names)
 
     if len(variant_list) == 0 and not variants_file.endswith(".json"):
         variant_list, name = parse_textfile_in(refseq, features_dict, variants_file, constellation_names)
 
-    return name, variant_list, rule_dict
+    return name, variant_list, rule_dict, mrca_lineage
 
 
 def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=False):
@@ -410,24 +416,23 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
         #print(call, query_allele)
 
     elif var["type"] == "del" and var["space"] == "aa":
-        query_allele = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + 3*var["length"] + 2]
+        query_allele = record_seq.upper()[var["ref_start"] - 4:var["ref_start"] + 3*var["length"] + 2]
         query_allele = query_allele.replace("-","")
+        if len(query_allele) % 3 != 0:
+            print("Warning: while typing variant %s (before,ref,after) = (%s,%s,%s) found sequence with query allele %s. Handling by adding Ns which will result in ambiguous calls" %(var["name"], var["before"], var["ref_allele"], var["after"], record_seq.upper()[var["ref_start"] - 4:var["ref_start"] + 3*var["length"] + 2]))
         while len(query_allele) % 3 != 0:
             query_allele += "N"
         query_allele = query_allele.translate()
-        #print("call for del in aa space with ref %s, after %s, length %d and query_allele %s" %(var["ref_allele"], var["after"], var["length"], query_allele))
-        if query_allele == var["ref_allele"]+var["after"]:
+        #print("call for del in aa space with before %s, ref %s, after %s, length %d and query_allele %s" %(var["before"], var["ref_allele"], var["after"], var["length"], query_allele))
+        if query_allele == var["before"] + var["ref_allele"] + var["after"]:
             call = 'ref'
             query_allele = 0
-        elif query_allele == var["after"]:
+        elif query_allele == var["before"] + var["after"]:
             call = 'alt'
             query_allele = var["length"]
         elif "X" in query_allele:
             call = 'ambig'
-            if not oth_char:
-                query_allele = "X"
-            else:
-                query_allele = "N"
+            query_allele = "X"
         else:
             call = 'oth'
             if not oth_char:
@@ -541,7 +546,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
     constellation_dict = {}
     for constellation_file in list_constellation_files:
-        constellation, variants, ignore = parse_variants_in(reference_seq, features_dict, constellation_file, label=label)
+        constellation, variants, ignore, mrca_lineage = parse_variants_in(reference_seq, features_dict, constellation_file, label=label)
         if not constellation:
             continue
         if len(variants) > 0:
@@ -591,8 +596,9 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
 
     constellation_dict = {}
     rule_dict = {}
+    mrca_lineage_dict = {}
     for constellation_file in list_constellation_files:
-        constellation, variants, rules = parse_variants_in(reference_seq, features_dict, constellation_file,
+        constellation, variants, rules, mrca_lineage = parse_variants_in(reference_seq, features_dict, constellation_file,
                                                            constellation_names, include_ancestral=True, label=label)
         if constellation_names and constellation not in constellation_names:
             continue
@@ -606,15 +612,16 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             print("Found file %s for constellation %s containing %i variants" % (
             constellation_file, constellation, len([v["name"] for v in variants])))
             print("Rules", rule_dict[constellation])
+            mrca_lineage_dict[constellation] = mrca_lineage
         else:
             print("Warning: %s is not a valid constellation file - ignoring" % constellation_file)
 
     variants_out = open(out_csv, "w")
     if long and not call_all:
-        variants_out.write("query,constellations,ref_count,alt_count,ambig_count,other_count,rule_count,support,"
+        variants_out.write("query,constellations,mrca_lineage,ref_count,alt_count,ambig_count,other_count,rule_count,support,"
                            "conflict\n")
     else:
-        variants_out.write("query,constellations\n")
+        variants_out.write("query,constellations,mrca_lineage\n")
 
     counts_out = {}
     if output_counts:
@@ -662,14 +669,18 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             if not call_all and best_constellation:
                 lineages.append(best_constellation)
             if long and best_counts is not None:
-                variants_out.write("%s,%s,%i,%i,%i,%i,%i,%f,%f\n" % (record.id, "|".join(lineages), best_counts['ref'],
+                variants_out.write("%s,%s,%s,%i,%i,%i,%i,%i,%f,%f\n" % (record.id, "|".join(lineages),
+                                                                     "|".join([mrca_lineage_dict[l] for l in lineages]),
+                                                                     best_counts['ref'],
                                                                      best_counts['alt'], best_counts['ambig'],
                                                                      best_counts['oth'], best_counts['rules'],
                                                                      best_counts['support'], best_counts['conflict']))
-            elif long:
-                variants_out.write("%s,%s,,,,,,,\n" % (record.id, "|".join(lineages)))
+            elif long and not call_all:
+                variants_out.write("%s,%s,%s,,,,,,,\n" % (record.id, "|".join(lineages),
+                                   "|".join([mrca_lineage_dict[l] for l in lineages])))
             else:
-                variants_out.write("%s,%s\n" % (record.id, "|".join(lineages)))
+                variants_out.write("%s,%s,%s\n" % (record.id, "|".join(lineages),
+                                                   "|".join([mrca_lineage_dict[l] for l in lineages])))
 
     variants_out.close()
     for constellation in counts_out:

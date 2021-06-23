@@ -26,15 +26,15 @@ variants_list = [
             {'cds': 'orf1a', 'ref_allele': 'TI', 'aa_pos': 1001, 'alt_allele': '', 'name': '1ab:TI1001',
              'type': 'aa', 'ref_start': 3266, 'fuzzy': True},
             {'cds': 'orf1a', 'ref_allele': 'T', 'aa_pos': 1001, 'alt_allele': 'del', 'name': 'orf1ab:T1001del',
-             'type': 'del', 'ref_start': 3266, 'length': 1, 'space': 'aa', 'after': 'I'},
+             'type': 'del', 'ref_start': 3266, 'length': 1, 'space': 'aa', 'after': 'I', 'before': 'T'},
             {'cds': 'orf1a', 'ref_allele': 'T', 'aa_pos': 1001, 'alt_allele': '-', 'name': 'orf1ab:T1001-',
-             'type': 'del', 'ref_start': 3266, 'length': 1, 'space': 'aa', 'after': 'I'},
+             'type': 'del', 'ref_start': 3266, 'length': 1, 'space': 'aa', 'after': 'I', 'before': 'T'},
             {'cds': 'orf1a', 'ref_allele': 'T', 'aa_pos': 1001, 'alt_allele': 'del', 'name': '1ab:T1001del',
-             'type': 'del', 'ref_start': 3266, 'length': 1, 'space': 'aa', 'after': 'I'},
+             'type': 'del', 'ref_start': 3266, 'length': 1, 'space': 'aa', 'after': 'I', 'before': 'T'},
             {'cds': 'orf1a', 'ref_allele': 'T', 'aa_pos': 1001, 'alt_allele': 'del', 'name': '1ab:T1001del',
-             'type': 'del', 'ref_start': 3266, 'length': 1, 'space': 'aa', 'after': 'I'},
+             'type': 'del', 'ref_start': 3266, 'length': 1, 'space': 'aa', 'after': 'I', 'before': 'T'},
             {'cds': 'orf1a', 'ref_allele': 'TI', 'aa_pos': 1001, 'alt_allele': '-', 'name': '1ab:TI1001-',
-             'type': 'del', 'ref_start': 3266, 'length': 2, 'space': 'aa', 'after': 'Q'},
+             'type': 'del', 'ref_start': 3266, 'length': 2, 'space': 'aa', 'after': 'Q', 'before': 'T'},
             {'cds': 'orf1a', 'ref_allele': '', 'aa_pos': 1001, 'alt_allele': 'AAT', 'name': '1ab:1001+AAT',
              'type': 'ins', 'ref_start': 3266}
     ]
@@ -50,7 +50,7 @@ del1 = {"name": "del1", "type": "del", "ref_start": 15, "ref_allele": "AG", "alt
 ins1 = {"name": "ins1", "type": "ins", "ref_start": 17, "ref_allele": "", "alt_allele": "AAC"}
 del1a = {"name": "del1", "type": "del", "ref_start": 16, "ref_allele": "AAAAGC", "alt_allele": "", "length": 6, "space": "nuc"}
 ins1a = {"name": "ins1", "type": "ins", "ref_start": 21, "ref_allele": "", "alt_allele": "AAC"}
-del1b = {"name": "del1", "type": "del", "ref_start": 16, "ref_allele": "KS", "alt_allele": "-", "length": 2, "space": "aa", "after":"S"}
+del1b = {"name": "del1", "type": "del", "ref_start": 16, "ref_allele": "KS", "alt_allele": "-", "length": 2, "space": "aa", "after":"S", 'before': '*'}
 
 
 def test_load_feature_coordinates():
@@ -141,7 +141,7 @@ def test_variant_to_variant_record():
 
 def test_parse_json_in():
     variants_file = "%s/lineage_X.json" % data_dir
-    variant_list, name, rules = parse_json_in(refseq, features_dict, variants_file)
+    variant_list, name, rules, mrca_lineage = parse_json_in(refseq, features_dict, variants_file)
     assert len(variant_list) == 24
     assert len([v for v in variant_list if v["type"] == "snp"]) == 6
     assert len([v for v in variant_list if v["type"] == "del"]) == 3
@@ -150,6 +150,7 @@ def test_parse_json_in():
     assert rules["min_alt"] == 4
     assert rules["max_ref"] == 6
     assert rules["s:E484K"] == "alt"
+    assert mrca_lineage == "B.1.1.7"
 
 
 def test_parse_csv_in():
@@ -183,7 +184,7 @@ def test_parse_variants_in():
 
     results = []
     for i in range(len(in_files)):
-        name, variant_list, rule_dict = parse_variants_in(refseq, features_dict, in_files[i])
+        name, variant_list, rule_dict, mrca_lineage = parse_variants_in(refseq, features_dict, in_files[i])
         assert expect_names[i] == name
         assert expect_rules[i] == rule_dict
         results.append(variant_list)
@@ -196,7 +197,7 @@ def test_call_variant_from_fasta():
     ref_string = "aaaattagctcgtaaaaaagctcgcaatag"
     alt_string = "aaaatcagcacgtaa------tcgcaatag"
     ambig_string = "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
-    oth_string = "aaaattcgcccgta---aagctcgcaatag"
+    oth_string = "aaaattcgcccgtaa---agctcgcaatag"
 
     print(Seq(ref_string).translate())
     print(Seq(alt_string).replace("-","").translate())
