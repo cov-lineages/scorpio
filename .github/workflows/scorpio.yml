@@ -1,0 +1,30 @@
+name: scorpio
+on: [push, pull_request]
+defaults:
+  run:
+    shell: bash -l {0}
+
+jobs:
+  run_pangolin_test:
+    name: Scorpio test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "macos-latest"]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          environment-file: environment.yml
+          activate-environment: scorpio
+          channels: conda-forge,bioconda,defaults
+          mamba-version: "*"
+      - name: Install scorpio
+        run: pip install -e .
+      - name: Check scorpio version
+        run: scorpio --version
+      - name: Run scorpio unittests
+        run: pytest 2>&1 | tee scorpio_pytests.log
+      - name: Run scorpio in pangolin mode with test data
+        run: scorpio classify -i scorpio/tests/data/type_constellations/test.fa --pangolin --output-counts --long 2>&1 | tee scorpio_pangolin.log
+# add more tests here
