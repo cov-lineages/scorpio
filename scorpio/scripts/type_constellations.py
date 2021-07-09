@@ -224,16 +224,20 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
     name = None
     rules = None
     mrca_lineage = ""
+    incompatible_lineage_calls = ""
 
     in_json = open(variants_file, 'r')
     json_dict = json.load(in_json, strict=False)
 
-    if "type" in json_dict and json_dict["type"] in json_dict and "mrca_lineage" in json_dict[json_dict["type"]]:
-        m = re.match(r'[A-Z0-9.]*', json_dict[json_dict["type"]]["mrca_lineage"])
-        if not m:
-            sys.stderr.write("Warning: mrca_lineage %s not in acceptable format - ignoring\n" % json_dict[json_dict["type"]]["mrca_lineage"])
-        else:
-            mrca_lineage = json_dict[json_dict["type"]]["mrca_lineage"]
+    if "type" in json_dict and json_dict["type"] in json_dict:
+        if "mrca_lineage" in json_dict[json_dict["type"]]:
+            m = re.match(r'[A-Z0-9.]*', json_dict[json_dict["type"]]["mrca_lineage"])
+            if not m:
+                sys.stderr.write("Warning: mrca_lineage %s not in acceptable format - ignoring\n" % json_dict[json_dict["type"]]["mrca_lineage"])
+            else:
+                mrca_lineage = json_dict[json_dict["type"]]["mrca_lineage"]
+        if "incompatible_lineage_calls" in json_dict[json_dict["type"]]:
+            incompatible_lineage_calls = "|".join(json_dict[json_dict["type"]]["incompatible_lineage_calls"])
 
 
     if label:
@@ -247,9 +251,9 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
         name = parse_name_from_file(variants_file)
 
     if not name:
-        return variant_list, name, rules, mrca_lineage
+        return variant_list, name, rules, mrca_lineage, incompatible_lineage_calls
     if constellation_names and name not in constellation_names:
-        return variant_list, name, rules, mrca_lineage
+        return variant_list, name, rules, mrca_lineage, incompatible_lineage_calls
 
     print("\nParsing constellation JSON file %s" % variants_file)
 
@@ -269,7 +273,7 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
 
     in_json.close()
 
-    return variant_list, name, rules, mrca_lineage
+    return variant_list, name, rules, mrca_lineage, incompatible_lineage_calls
 
 
 def parse_csv_in(refseq, features_dict, variants_file, constellation_names=None):
@@ -362,16 +366,17 @@ def parse_variants_in(refseq, features_dict, variants_file, constellation_names=
     variant_list = []
     rule_dict = None
     mrca_lineage = ""
+    incompatible_lineage_calls = ""
 
     if variants_file.endswith(".json"):
-        variant_list, name, rule_dict, mrca_lineage = parse_json_in(refseq, features_dict, variants_file, constellation_names, include_ancestral=include_ancestral,label=label)
+        variant_list, name, rule_dict, mrca_lineage, incompatible_lineage_calls = parse_json_in(refseq, features_dict, variants_file, constellation_names, include_ancestral=include_ancestral,label=label)
     elif variants_file.endswith(".csv"):
         variant_list, name, rule_dict = parse_csv_in(refseq, features_dict, variants_file, constellation_names)
 
     if len(variant_list) == 0 and not variants_file.endswith(".json"):
         variant_list, name = parse_textfile_in(refseq, features_dict, variants_file, constellation_names)
 
-    return name, variant_list, rule_dict, mrca_lineage
+    return name, variant_list, rule_dict, mrca_lineage, incompatible_lineage_calls
 
 
 def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=False):
@@ -556,7 +561,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
     constellation_dict = {}
     for constellation_file in list_constellation_files:
-        constellation, variants, ignore, mrca_lineage = parse_variants_in(reference_seq, features_dict, constellation_file, label=label)
+        constellation, variants, ignore, mrca_lineage, incompatible_lineage_calls = parse_variants_in(reference_seq, features_dict, constellation_file, label=label)
         if not constellation:
             continue
         if len(variants) > 0:
@@ -600,15 +605,16 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
 
 def classify_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json,
-                            output_counts=False, call_all=False, long=False, label=None):
+                            output_counts=False, call_all=False, long=False, label=None, list_incompatible=False):
 
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
     constellation_dict = {}
     rule_dict = {}
     mrca_lineage_dict = {}
+    incompatible_dict = {}
     for constellation_file in list_constellation_files:
-        constellation, variants, rules, mrca_lineage = parse_variants_in(reference_seq, features_dict, constellation_file,
+        constellation, variants, rules, mrca_lineage, incompatible_lineage_calls = parse_variants_in(reference_seq, features_dict, constellation_file,
                                                            constellation_names, include_ancestral=True, label=label)
         if constellation_names and constellation not in constellation_names:
             continue
@@ -623,15 +629,17 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             constellation_file, constellation, len([v["name"] for v in variants])))
             print("Rules", rule_dict[constellation])
             mrca_lineage_dict[constellation] = mrca_lineage
+            incompatible_dict[constellation] = incompatible_lineage_calls
         else:
             print("Warning: %s is not a valid constellation file - ignoring" % constellation_file)
 
     variants_out = open(out_csv, "w")
+    columns = ["query","constellations","mrca_lineage"]
+    if list_incompatible:
+        columns.append("incompatible_lineages")
     if long and not call_all:
-        variants_out.write("query,constellations,mrca_lineage,ref_count,alt_count,ambig_count,other_count,rule_count,support,"
-                           "conflict\n")
-    else:
-        variants_out.write("query,constellations,mrca_lineage\n")
+        columns.extend(["ref_count","alt_count","ambig_count","other_count","rule_count","support","conflict"])
+    variants_out.write("%s\n" %",".join(columns))
 
     counts_out = {}
     if output_counts:
@@ -678,19 +686,19 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                                                           counts['conflict'], call))
             if not call_all and best_constellation:
                 lineages.append(best_constellation)
+
+            out_entries = [record.id, "|".join(lineages),"|".join([mrca_lineage_dict[l] for l in lineages])]
+            if list_incompatible:
+                out_entries.append("|".join([incompatible_dict[l] for l in lineages]))
             if long and best_counts is not None:
-                variants_out.write("%s,%s,%s,%i,%i,%i,%i,%i,%f,%f\n" % (record.id, "|".join(lineages),
-                                                                     "|".join([mrca_lineage_dict[l] for l in lineages]),
-                                                                     best_counts['ref'],
-                                                                     best_counts['alt'], best_counts['ambig'],
-                                                                     best_counts['oth'], best_counts['rules'],
-                                                                     best_counts['support'], best_counts['conflict']))
+                out_entries.append("%i,%i,%i,%i,%i,%f,%f" % (best_counts['ref'],
+                                                             best_counts['alt'], best_counts['ambig'],
+                                                             best_counts['oth'], best_counts['rules'],
+                                                             best_counts['support'], best_counts['conflict']))
             elif long and not call_all:
-                variants_out.write("%s,%s,%s,,,,,,,\n" % (record.id, "|".join(lineages),
-                                   "|".join([mrca_lineage_dict[l] for l in lineages])))
-            else:
-                variants_out.write("%s,%s,%s\n" % (record.id, "|".join(lineages),
-                                                   "|".join([mrca_lineage_dict[l] for l in lineages])))
+                out_entries.append(",,,,,,")
+
+            variants_out.write("%s\n" % ",".join(out_entries))
 
     variants_out.close()
     for constellation in counts_out:

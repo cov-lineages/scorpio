@@ -79,6 +79,10 @@ def main(sysargs = sys.argv[1:]):
         "--long", dest="long", action="store_true",
         help="Write out summary file in long format"
     )
+    subparser_classify.add_argument(
+        "--list-incompatible", dest="list_incompatible", action="store_true",
+        help="Adds column listing incompatible lineages listed in JSON"
+    )
 
     subparser_classify.set_defaults(func=scorpio.subcommands.classify.run)
 

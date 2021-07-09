@@ -141,7 +141,7 @@ def test_variant_to_variant_record():
 
 def test_parse_json_in():
     variants_file = "%s/lineage_X.json" % data_dir
-    variant_list, name, rules, mrca_lineage = parse_json_in(refseq, features_dict, variants_file)
+    variant_list, name, rules, mrca_lineage, incompatible_lineages = parse_json_in(refseq, features_dict, variants_file)
     assert len(variant_list) == 24
     assert len([v for v in variant_list if v["type"] == "snp"]) == 6
     assert len([v for v in variant_list if v["type"] == "del"]) == 3
@@ -151,6 +151,7 @@ def test_parse_json_in():
     assert rules["max_ref"] == 6
     assert rules["s:E484K"] == "alt"
     assert mrca_lineage == "B.1.1.7"
+    assert incompatible_lineages == "A|B.1.351"
 
 
 def test_parse_csv_in():
@@ -184,7 +185,7 @@ def test_parse_variants_in():
 
     results = []
     for i in range(len(in_files)):
-        name, variant_list, rule_dict, mrca_lineage = parse_variants_in(refseq, features_dict, in_files[i])
+        name, variant_list, rule_dict, mrca_lineage, incompatible_lineages = parse_variants_in(refseq, features_dict, in_files[i])
         assert expect_names[i] == name
         assert expect_rules[i] == rule_dict
         results.append(variant_list)
@@ -200,9 +201,9 @@ def test_call_variant_from_fasta():
     oth_string = "aaaattcgcccgtaa---agctcgcaatag"
 
     print(Seq(ref_string).translate())
-    print(Seq(alt_string).replace("-","").translate())
+    print(Seq(alt_string.replace("-","")).translate())
     print(Seq(ambig_string).translate())
-    print(Seq(oth_string).replace("-","").translate())
+    print(Seq(oth_string.replace("-","")).translate())
 
     for var in variants:
         call, query_allele = call_variant_from_fasta(Seq(ref_string), var)
@@ -303,6 +304,19 @@ def test_classify_constellations():
                             output_counts=output_counts)
 
     expected = "%s/expected.classified.csv" % data_dir
+    assert filecmp.cmp(out_csv, expected, shallow=False)
+    os.unlink(out_csv)
+
+def test_classify_constellations_incompatible():
+    in_fasta = "%s/test.fa" % data_dir
+    list_constellation_files = ["%s/lineage_X.json" % data_dir]
+    constellation_names = None
+    out_csv = "%s/tmp.classify_constellations.incompatible.csv" % data_dir
+    output_counts = False
+    classify_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, json_file,
+                            output_counts=output_counts, list_incompatible=True)
+
+    expected = "%s/expected.classified.incompatible.csv" % data_dir
     assert filecmp.cmp(out_csv, expected, shallow=False)
     os.unlink(out_csv)
 
