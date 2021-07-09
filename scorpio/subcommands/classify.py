@@ -12,4 +12,5 @@ def run(options):
                         options.output_counts,
                         options.call_all,
                         options.long,
-                        options.label)
+                        options.label,
+                        options.list_incompatible)

@@ -2,7 +2,8 @@
 	"name": "Lineage_X",
 	"type": "variant",
 	"variant": {
-		"mrca_lineage": "B.1.1.7"
+		"mrca_lineage": "B.1.1.7",
+		"incompatible_lineage_calls": ["A", "B.1.351"]
 	},
 	"sites": [
 		"nuc:C912T",
