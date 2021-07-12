@@ -11,4 +11,5 @@ def run(options):
                         options.reference_json,
                         options.ref_char,
                         options.output_counts,
-                        options.label)
+                        options.label,
+                        options.append_genotypes)

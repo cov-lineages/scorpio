@@ -552,17 +552,19 @@ def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_
     counts['support'] = round(counts['alt'] / float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']), 4)
     counts['conflict'] = round(counts['ref'] / float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']), 4)
 
-    return ''.join(barcode_list), counts
+    return barcode_list, counts
 
 
 def type_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json, ref_char=None,
-                        output_counts=False, label=None):
+                        output_counts=False, label=None, append_genotypes=False):
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
     constellation_dict = {}
     for constellation_file in list_constellation_files:
         constellation, variants, ignore, mrca_lineage, incompatible_lineage_calls = parse_variants_in(reference_seq, features_dict, constellation_file, label=label)
         if not constellation:
+            continue
+        if constellation_names and constellation not in constellation_names:
             continue
         if len(variants) > 0:
             constellation_dict[constellation] = variants
@@ -579,7 +581,10 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
         for constellation in constellation_dict:
             clean_name = re.sub("[^a-zA-Z0-9_\-.]", "_", constellation)
             counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), clean_name), "w")
-            counts_out[constellation].write("query,ref_count,alt_count,ambig_count,other_count,support,conflict\n")
+            columns = ["query,ref_count,alt_count,ambig_count,other_count,support,conflict"]
+            if append_genotypes:
+                columns.extend([var["name"] for var in constellation_dict[constellation]])
+            counts_out[constellation].write("%s\n" % ','.join(columns))
 
     with open(in_fasta, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
@@ -590,11 +595,14 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
             out_list = [record.id]
             for constellation in constellation_dict:
-                barcode, counts = generate_barcode(record.seq, constellation_dict[constellation], ref_char)
+                barcode_list, counts = generate_barcode(record.seq, constellation_dict[constellation], ref_char)
                 if output_counts:
-                    counts_out[constellation].write("%s,%i,%i,%i,%i,%f,%f\n" % (record.id, counts['ref'], counts['alt'],
-                                                 counts['ambig'], counts['oth'], counts['support'], counts['conflict']))
-                out_list.append(barcode)
+                    columns = ["%s,%i,%i,%i,%i,%f,%f" % (record.id, counts['ref'], counts['alt'],
+                               counts['ambig'], counts['oth'], counts['support'], counts['conflict'])]
+                    if append_genotypes:
+                        columns.extend(barcode_list)
+                    counts_out[constellation].write("%s\n" % ','.join(columns))
+                out_list.append(''.join(barcode_list))
 
             variants_out.write("%s\n" % ",".join(out_list))
 
