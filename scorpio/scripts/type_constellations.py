@@ -378,6 +378,22 @@ def parse_variants_in(refseq, features_dict, variants_file, constellation_names=
 
     return name, variant_list, rule_dict, mrca_lineage, incompatible_lineage_calls
 
+
+def parse_mutations_in(mutations_file):
+    print("\nParsing mutations file %s" % mutations_file)
+
+    mutations_list = []
+    with open("%s" % mutations_file, "r") as f:
+        for line in f:
+            l = line.split("#")[0].strip().split(',')[0]  # remove comments from the line and assume in first column
+            if len(l) > 0:  # skip blank lines (or comment only lines)
+                if l.startswith('id'):
+                    continue
+                mutations_list.append(l)
+    print("Found %d mutations" % len(mutations_list))
+    return mutations_list
+
+
 def parse_mutations(refseq, features_dict, mutations_list):
     """
     Parse the mutations specified on command line and make a mutations constellation for them
@@ -589,6 +605,13 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
         else:
             print("Warning: %s is not a valid constellation file - ignoring" % constellation_file)
     if mutations_list:
+        new_mutations_list = []
+        for entry in mutations_list:
+            if '.' in entry:
+                new_mutations_list.extend(parse_mutations_in(entry))  # this is a file
+            else:
+                new_mutations_list.append(entry)
+        mutations_list = new_mutations_list
         mutation_variants = parse_mutations(reference_seq, features_dict, mutations_list)
         if len(constellation_dict) == 1:
             constellation = list(constellation_dict)[0]
@@ -678,6 +701,13 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             print("Warning: %s is not a valid constellation file - ignoring" % constellation_file)
 
     if mutations_list:
+        new_mutations_list = []
+        for entry in mutations_list:
+            if '.' in entry:
+                new_mutations_list.extend(parse_mutations_in(entry)) # this is a file
+            else:
+                new_mutations_list.append(entry)
+        mutations_list = new_mutations_list
         mutation_variants = parse_mutations(reference_seq, features_dict, mutations_list)
 
     variants_out = open(out_csv, "w")
