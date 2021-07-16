@@ -613,7 +613,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
                 new_mutations_list.append(entry)
         mutations_list = new_mutations_list
         mutation_variants = parse_mutations(reference_seq, features_dict, mutations_list)
-        if len(constellation_dict) == 1:
+        if len(constellation_dict) == 1 and "mutations" not in constellation_dict:
             constellation = list(constellation_dict)[0]
             new_constellation = "%s+%s" %(constellation, '|'.join(mutations_list))
             constellation_dict[new_constellation] = constellation_dict[constellation] + mutation_variants
