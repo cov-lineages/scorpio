@@ -573,14 +573,19 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
         else:
             print("Warning: %s is not a valid constellation file - ignoring" % constellation_file)
 
-    variants_out = open(out_csv, "w")
-    variants_out.write("query,%s\n" % ",".join(list(constellation_dict.keys())))
+    variants_out = None
+    if len(constellation_dict) > 1 or not output_counts:
+        variants_out = open(out_csv, "w")
+        variants_out.write("query,%s\n" % ",".join(list(constellation_dict.keys())))
 
     counts_out = {}
     if output_counts:
         for constellation in constellation_dict:
             clean_name = re.sub("[^a-zA-Z0-9_\-.]", "_", constellation)
-            counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), clean_name), "w")
+            if len(constellation_dict) == 1:
+                counts_out[constellation] = open(out_csv, "w")
+            else:
+                counts_out[constellation] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), clean_name), "w")
             columns = ["query,ref_count,alt_count,ambig_count,other_count,support,conflict"]
             if append_genotypes:
                 columns.extend([var["name"] for var in constellation_dict[constellation]])
@@ -603,10 +608,11 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
                         columns.extend(barcode_list)
                     counts_out[constellation].write("%s\n" % ','.join(columns))
                 out_list.append(''.join(barcode_list))
+            if variants_out:
+                variants_out.write("%s\n" % ",".join(out_list))
 
-            variants_out.write("%s\n" % ",".join(out_list))
-
-    variants_out.close()
+    if variants_out:
+        variants_out.close()
     for constellation in counts_out:
         if counts_out[constellation]:
             counts_out[constellation].close()
