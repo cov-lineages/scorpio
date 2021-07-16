@@ -124,6 +124,8 @@ def translate_if_possible(nuc_start, nuc_ref, nuc_alt, feature_dict, reference_s
     #print(query_seq[nuc_start-5: nuc_end+5])
 
     for feature in feature_dict:
+        if len(feature_dict[feature]) > 2:
+            continue # ignore nsp definitions
         if feature_dict[feature][0] <= nuc_start <= feature_dict[feature][1]:
             start, end = nuc_start, nuc_end
             while (start - feature_dict[feature][0]) % 3 != 0:

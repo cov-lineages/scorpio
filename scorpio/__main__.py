@@ -99,12 +99,16 @@ def main(sysargs = sys.argv[1:]):
                                  ' and their coordinates'
     )
     subparser_haplotype.add_argument(
-        "--ref-char", dest="ref_char", default='-', required=False,
+        "--ref-char", dest="ref_char", required=False,
         help="Symbol to use to represent reference allele"
     )
     subparser_haplotype.add_argument(
         "--output-counts", dest="output_counts", action="store_true",
         help="Save a file per constellation of ref, alt and other counts"
+    )
+    subparser_haplotype.add_argument(
+        "--append-genotypes", dest="append_genotypes", action="store_true",
+        help="Output a column per variant with the call"
     )
     subparser_haplotype.set_defaults(func=scorpio.subcommands.haplotype.run)
 
@@ -223,6 +227,14 @@ def main(sysargs = sys.argv[1:]):
 
         if "call_all" in args and args.call_all and args.long:
             print("Cannot provide long format summary file with multiple calls, ignoring --long\n")
+
+        if "append_genotypes" in args and args.append_genotypes and not args.ref_char:
+            args.ref_char = None
+        elif "ref_char" in args and not args.ref_char:
+            args.ref_char = '-'
+
+        if "append_genotypes" in args and args.append_genotypes and not args.output_counts:
+            args.output_counts = True
 
     """
     Exit with help menu if no args supplied

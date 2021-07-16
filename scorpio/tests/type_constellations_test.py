@@ -276,20 +276,24 @@ def test_generate_barcode():
                      {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "support": 0.1667, "conflict": 0.0}]
 
     for i in range(len(seqs)):
-        barcode, counts = generate_barcode(seqs[i], variants, ref_char="-", ins_char="?", oth_char="X")
+        barcode_list, counts = generate_barcode(seqs[i], variants, ref_char="-", ins_char="?", oth_char="X")
+        barcode = ''.join(barcode_list)
         print(i, barcode, counts)
         assert barcode == expect_barcode_dash[i]
         assert counts == expect_counts[i]
 
-        barcode, counts = generate_barcode(seqs[i], variants, ref_char=None, ins_char="?", oth_char="X")
+        barcode_list, counts = generate_barcode(seqs[i], variants, ref_char=None, ins_char="?", oth_char="X")
+        barcode = ''.join(barcode_list)
         print(i, barcode, counts)
         assert barcode == expect_barcode_ref[i]
 
-        barcode, counts = generate_barcode(seqs[i], variants, ref_char=None, ins_char="?", oth_char=None)
+        barcode_list, counts = generate_barcode(seqs[i], variants, ref_char=None, ins_char="?", oth_char=None)
+        barcode = ''.join(barcode_list)
         print(i, barcode, counts)
         assert barcode == expect_barcode_ref_oth[i]
 
-        barcode, counts = generate_barcode(seqs[i], variants, ref_char="-", ins_char="$", oth_char="X")
+        barcode_list, counts = generate_barcode(seqs[i], variants, ref_char="-", ins_char="$", oth_char="X")
+        barcode = ''.join(barcode_list)
         print(i, barcode, counts)
         assert barcode == expect_barcode_ins[i]
 
