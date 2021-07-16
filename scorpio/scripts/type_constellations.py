@@ -649,7 +649,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
 
 def classify_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json,
-                            output_counts=False, call_all=False, long=False, label=None, list_incompatible=False):
+                            output_counts=False, call_all=False, long=False, label=None, list_incompatible=False, mutations_list=None):
 
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
@@ -677,12 +677,17 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
         else:
             print("Warning: %s is not a valid constellation file - ignoring" % constellation_file)
 
+    if mutations_list:
+        mutation_variants = parse_mutations(reference_seq, features_dict, mutations_list)
+
     variants_out = open(out_csv, "w")
     columns = ["query","constellations","mrca_lineage"]
     if list_incompatible:
         columns.append("incompatible_lineages")
     if long and not call_all:
         columns.extend(["ref_count","alt_count","ambig_count","other_count","rule_count","support","conflict"])
+    if mutations_list:
+        columns.extend(mutations_list)
     variants_out.write("%s\n" %",".join(columns))
 
     counts_out = {}
@@ -741,6 +746,10 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                                                              best_counts['support'], best_counts['conflict']))
             elif long and not call_all:
                 out_entries.append(",,,,,,")
+
+            if mutations_list:
+                barcode_list, counts = generate_barcode(record.seq, mutation_variants)
+                out_entries.extend(barcode_list)
 
             variants_out.write("%s\n" % ",".join(out_entries))
 

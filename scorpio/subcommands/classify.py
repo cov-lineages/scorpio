@@ -13,4 +13,5 @@ def run(options):
                         options.call_all,
                         options.long,
                         options.label,
-                        options.list_incompatible)
+                        options.list_incompatible,
+                        options.mutations)
