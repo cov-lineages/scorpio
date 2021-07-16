@@ -47,6 +47,8 @@ def main(sysargs = sys.argv[1:]):
     constellation_group.add_argument('--pangolin', dest='pangolin', action='store_true',
                                     help='Uses `mrca_lineage` as label and excludes constellations/data directory for'
                                          ' robustness')
+    constellation_group.add_argument("--mutations", dest="mutations", required=False, nargs='+',
+                                     help="Extra mutations to type")
 
     misc_group = common.add_argument_group('Misc options')
     misc_group.add_argument('--tempdir', action="store",
@@ -232,9 +234,6 @@ def main(sysargs = sys.argv[1:]):
             args.ref_char = None
         elif "ref_char" in args and not args.ref_char:
             args.ref_char = '-'
-
-        if "append_genotypes" in args and args.append_genotypes and not args.output_counts:
-            args.output_counts = True
 
     """
     Exit with help menu if no args supplied

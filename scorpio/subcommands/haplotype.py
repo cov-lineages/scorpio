@@ -12,4 +12,5 @@ def run(options):
                         options.ref_char,
                         options.output_counts,
                         options.label,
-                        options.append_genotypes)
+                        options.append_genotypes,
+                        options.mutations)
