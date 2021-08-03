@@ -62,3 +62,34 @@ The general format of a mutation code is:
 where `gene` is a gene code (or `nuc` for the genomic nucleotide sequence), `ref` is the nucleotide or amino acids in the reference, `alt` is the specific nucleotide or amino acid for the mutatant. Either of `ref` or `alt` can be missing if no specific state is required.
 
 Rules can either specify [min|max]_[ref|alt|ambig|oth] OR the call required at a mutation e.g. "N:S235F": (not )[ref|alt|ambig|oth]
+
+## Valid Mutation Definitions
+The following are valid ways to describe variants of each type. We prefer the definition at the top of each list, but provide alternatives for backwards compatibility. 
+* these are case insensitive e.g. S vs s
+* genes can be full e.g. orf1ab spike, or shortened e.g. 1ab, s
+* protein based definitions may be acceptable if the reference JSON includes them but may not be shortened e.g. NSP2
+* all coordinates are 1-based
+* for amino acid mutations, reference can be longer than 1 amino acid
+
+SNP:
+* nuc:[`ref`]`nucleotide_coordinate`[`alt`]
+* snp:[`ref`]`nucleotide_coordinate`[`alt`]
+
+Amino acid mutation: 
+* `gene`:[`ref`]`amino_acid_coordinate_relative_to_gene`[`alt`]
+* `protein`:[`ref`]`amino_acid_coordinate_relative_to_protein`[`alt`]
+* `gene`:[`ref`]`amino_acid_coordinate_relative_to_gene` - this allows any other aa to be called as alt
+* aa:`gene`:[`ref`]`amino_acid_coordinate_relative_to_gene`[`alt`]
+* aa:`protein`:[`ref`]`amino_acid_coordinate_relative_to_protein`[`alt`]
+* aa:`gene`:[`ref`]`amino_acid_coordinate_relative_to_gene` - this allows any other aa to be called as alt
+
+Deletion: 
+* del:`nucleotide_coordinate`:`nucleotide_length`
+* `gene`:[`ref`]`amino_acid_coordinate`-
+* `gene`:[`ref`]`amino_acid_coordinate`del
+
+Insertion (currently parsed but not typed):
+* nuc:`nucleotide_coordinate`+`inserted_sequence` 
+* snp:`nucleotide_coordinate`+`inserted_sequence` 
+* `gene`:`amino_acid_coordinate_relative_to_gene`+`inserted_sequence` 
+* aa:`gene`:`amino_acid_coordinate_relative_to_gene`+`inserted_sequence`
