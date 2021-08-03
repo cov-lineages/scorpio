@@ -55,6 +55,7 @@ def main(sysargs = sys.argv[1:]):
                             help="Specify where you want the temporary stuff to go Default: $TMPDIR")
     misc_group.add_argument("--no-temp", action="store_true", help="Output all intermediate files")
     misc_group.add_argument("--verbose", action="store_true", help="Print lots of stuff to screen")
+    misc_group.add_argument("--dry-run", dest="dry_run", action="store_true", help="Quit after checking constellations and variants are AOK")
     misc_group.add_argument('-t', '--threads', action='store', dest="threads", type=int, help="Number of threads")
 
     # _______________________________  classify  __________________________________#

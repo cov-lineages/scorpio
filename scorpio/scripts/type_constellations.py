@@ -402,12 +402,19 @@ def parse_mutations(refseq, features_dict, mutations_list):
     one dict per variant. format of subdict varies by variant type
     """
     variant_list = []
+    problematic = []
 
     for mutation in mutations_list:
         record = variant_to_variant_record(mutation, refseq, features_dict)
         if record != {}:
             variant_list.append(record)
+        else:
+            problematic.append(mutation)
 
+    if len(problematic) > 0:
+        sys.stderr.write("The following mutations were not provided in an acceptable format: %s\n\n"
+                         % ",".join(problematic))
+        sys.exit(1)
     return variant_list
 
 
@@ -588,12 +595,12 @@ def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_
 
 
 def type_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json, ref_char=None,
-                        output_counts=False, label=None, append_genotypes=False, mutations_list=None):
+                        output_counts=False, label=None, append_genotypes=False, mutations_list=None, dry_run=False):
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
     constellation_dict = {}
     for constellation_file in list_constellation_files:
-        constellation, variants, ignore, mrca_lineage, incompatible_lineage_calls = parse_variants_in(reference_seq, features_dict, constellation_file, label=label)
+        constellation, variants, ignore, mrca_lineage, incompatible_lineage_calls = parse_variants_in(reference_seq, features_dict, constellation_file, constellation_names, label=label)
         if not constellation:
             continue
         if constellation_names and constellation not in constellation_names:
@@ -612,6 +619,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
             else:
                 new_mutations_list.append(entry)
         mutations_list = new_mutations_list
+        print("Typing provided mutations %s" % ",".join(mutations_list))
         mutation_variants = parse_mutations(reference_seq, features_dict, mutations_list)
         if len(constellation_dict) == 1 and "mutations" not in constellation_dict:
             constellation = list(constellation_dict)[0]
@@ -622,8 +630,11 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
         else:
             constellation_dict["mutations"] = mutation_variants
 
+    if dry_run:
+        return
+
     variants_out = None
-    if len(constellation_dict) > 1 or not output_counts:
+    if len(constellation_dict) > 1 or not (output_counts or append_genotypes):
         variants_out = open(out_csv, "w")
         variants_out.write("query,%s\n" % ",".join(list(constellation_dict.keys())))
 
@@ -672,7 +683,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
 
 def classify_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json,
-                            output_counts=False, call_all=False, long=False, label=None, list_incompatible=False, mutations_list=None):
+                            output_counts=False, call_all=False, long=False, label=None, list_incompatible=False, mutations_list=None, dry_run=False):
 
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
@@ -709,6 +720,9 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                 new_mutations_list.append(entry)
         mutations_list = new_mutations_list
         mutation_variants = parse_mutations(reference_seq, features_dict, mutations_list)
+
+    if dry_run:
+        return
 
     variants_out = open(out_csv, "w")
     columns = ["query","constellations","mrca_lineage"]

@@ -13,4 +13,5 @@ def run(options):
                         options.output_counts,
                         options.label,
                         options.append_genotypes,
-                        options.mutations)
+                        options.mutations,
+                        options.dry_run)
