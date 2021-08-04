@@ -22,13 +22,13 @@ def main(sysargs = sys.argv[1:]):
     parser.add_argument("-cv", "--constellations-version", action='version', version=f"constellations {constellations.__version__}", help="show constellation's version number and exit")
 
     subparsers = parser.add_subparsers(
-        title="Available subcommands", help="", metavar=""
+        title="Available subcommands", help="", metavar="", dest='command'
     )
     # _______________________________   common  _________________________________#
     common = argparse.ArgumentParser(prog=_program, add_help=False)
 
     io_group = common.add_argument_group('Input/output options')
-    io_group.add_argument("-i", "--input", dest="input", required=True, help="Primary input file")
+    io_group.add_argument("-i", "--input", dest="input", required=False, help="Primary input file")
     io_group.add_argument("-m", "--metadata", dest="metadata", required=False, help="CSV of associated metadata")
 
     io_group.add_argument("-o", "--output", dest="output", required=False, help="Output file or path")
@@ -161,7 +161,20 @@ def main(sysargs = sys.argv[1:]):
 
     subparser_define.set_defaults(func=scorpio.subcommands.define.run)
 
+    # _______________________________  list  __________________________________#
 
+    subparser_list = subparsers.add_parser(
+        "list",
+        parents=[common],
+        help="Lists the constellations installed that would be typed/classified with the provided input options",
+    )
+    subparser_list.add_argument(
+        '--reference-json', dest="reference_json", help='JSON file containing keys "genome" with reference sequence '
+                                                        'and "proteins", "features" or "genes" with features of interest'
+                                                        ' and their coordinates'
+    )
+
+    subparser_list.set_defaults(func=scorpio.subcommands.list.run)
     # _________________________________________________________________________#
 
     args = parser.parse_args()
@@ -194,6 +207,12 @@ def main(sysargs = sys.argv[1:]):
     if not os.path.exists(args.prefix):
         os.mkdir(args.prefix)
 
+    ## Resolve verbosity
+    if args.command == 'list' and not args.verbose:
+        args.verbose = False
+    else:
+        args.verbose = True
+
     if not args.reference_json or not args.constellations:
         constellations_dir = constellations.__path__[0]
         reference_json = args.reference_json
@@ -202,7 +221,8 @@ def main(sysargs = sys.argv[1:]):
         constellation_subdirs = ["data", "definitions"]
         for dir in constellation_subdirs:
             data_dir = os.path.join(constellations_dir, dir)
-            print(f"Looking in {data_dir} for data files...")
+            if args.verbose:
+                print(f"Looking in {data_dir} for data files...")
             for r, d, f in os.walk(data_dir):
                 for fn in f:
                     if fn == "SARS-CoV-2.json":
@@ -214,21 +234,23 @@ def main(sysargs = sys.argv[1:]):
                     elif not args.pangolin and fn.endswith(".csv"):
                         list_constellation_files.append(os.path.join(r, fn))
         if (not args.reference_json and reference_json == "") or (not args.constellations and list_constellation_files == []):
-            print(sfunk.cyan(
-                """Please either provide a reference JSON and constellation definition file, or check your environment 
-                to make sure that constellations has been properly installed."""))
+            if args.verbose:
+                print("""Please either provide a reference JSON and constellation definition file, or check your environment 
+                to make sure that constellations has been properly installed.""")
             sys.exit(-1)
         if not args.reference_json:
             args.reference_json = reference_json
-            print("Found reference %s" %args.reference_json)
+            if args.verbose:
+                print("Found reference %s" %args.reference_json)
         if not args.constellations:
             args.constellations = list_constellation_files
-            print("Found constellations:")
-            for c in args.constellations:
-                print(c)
-            print("\n")
+            if args.verbose:
+                print("Found constellations:")
+                for c in args.constellations:
+                    print(c)
+                print("\n")
 
-        if "call_all" in args and args.call_all and args.long:
+        if "call_all" in args and args.call_all and args.long and args.verbose:
             print("Cannot provide long format summary file with multiple calls, ignoring --long\n")
 
         if "append_genotypes" in args and args.append_genotypes and not args.ref_char:
