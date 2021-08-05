@@ -55,7 +55,7 @@ def load_feature_coordinates(reference_json):
                         features_dict[name] = (start, end, json_dict[feature][item]["gene"])
                     else:
                         features_dict[name] = (start, end)
-                    logging.info("Found reference feature %s with coordinates" % name, features_dict[name])
+                    logging.info("Found reference feature %s with coordinates %s" % (name, features_dict[name]))
     if len(features_dict) == 0:
         sys.stderr.write("No features (keys \"genes\", \"proteins\" or \"features\" ) provided in JSON %s " %
                          reference_json)

@@ -163,7 +163,7 @@ def define_mutations(list_variants, feature_dict, reference_seq):
                 merged_list.append(new_var)
         elif var.startswith("ins") or var.startswith("del"):
             i, pos, add = var.split("_")
-            new_var = "%s:%i+%s" % (i, pos, add)
+            new_var = "%s:%s+%s" % (i, pos, add)
             if freq:
                 merged_list.append("%s:%s" % (new_var, freq))
             else:
