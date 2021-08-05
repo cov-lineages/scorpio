@@ -154,6 +154,10 @@ def main(sysargs = sys.argv[1:]):
         '--outgroups', dest='outgroups', required=False,
         help='Two column CSV with group, and pipe separated list of outgroup sequence_names for that list. '
              'Assumes outgroups will be in main input CSV')
+    subparser_define.add_argument(
+        "--protein", dest="protein", action="store_true",
+        help="Translates definition coordinates to proteins where possible"
+    )
 
     subparser_define.set_defaults(func=scorpio.subcommands.define.run)
 
@@ -243,7 +247,7 @@ def main(sysargs = sys.argv[1:]):
         if not args.reference_json:
             args.reference_json = reference_json
             logging.info("Found reference %s" %args.reference_json)
-        if not args.constellations:
+        if not args.constellations and args.command in ['haplotype', 'classify']:
             args.constellations = list_constellation_files
             logging.info("Found constellations:")
             for c in args.constellations:

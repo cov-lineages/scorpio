@@ -13,4 +13,5 @@ def run(options):
                         options.subset,
                         options.threshold_common,
                         options.threshold_intermediate,
-                        options.outgroups)
+                        options.outgroups,
+                        options.protein)

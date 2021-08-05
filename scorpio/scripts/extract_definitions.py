@@ -9,7 +9,7 @@ import logging
 from Bio.Seq import Seq
 from operator import itemgetter
 
-from .type_constellations import load_feature_coordinates
+from .type_constellations import load_feature_coordinates, resolve_ambiguous_cds
 
 def parse_args():
     parser = argparse.ArgumentParser(description="""Pick a representative sample for each unique sequence""",
@@ -90,6 +90,15 @@ def update_var_dict(var_dict, group, variants):
     return
 
 
+def update_feature_dict(feature_dict):
+    for feature in feature_dict:
+        if len(feature_dict[feature]) > 2:
+            cds, aa_pos = resolve_ambiguous_cds(feature_dict[feature][2], feature_dict[feature][0], feature_dict)
+            if aa_pos:
+                feature_dict[feature] = (aa_pos, feature_dict[feature][1] + feature_dict[feature][0] - aa_pos, cds)
+    return feature_dict
+
+
 def get_common_mutations(var_dict, min_occurance=3, threshold_common=0.98, threshold_intermediate=0.25):
     sorted_tuples = sorted(var_dict.items(), key=operator.itemgetter(1))
     var_dict = {k: v for k, v in sorted_tuples}
@@ -110,7 +119,7 @@ def get_common_mutations(var_dict, min_occurance=3, threshold_common=0.98, thres
     return common, intermediate
 
 
-def translate_if_possible(nuc_start, nuc_ref, nuc_alt, feature_dict, reference_seq):
+def translate_if_possible(nuc_start, nuc_ref, nuc_alt, feature_dict, reference_seq, include_protein=False):
     nuc_end = nuc_start + len(nuc_ref)
     nuc_start = int(nuc_start)
     nuc_end = int(nuc_end)
@@ -138,12 +147,26 @@ def translate_if_possible(nuc_start, nuc_ref, nuc_alt, feature_dict, reference_s
             if ref_allele == query_allele:
                 return "nuc:%s%i%s" % (nuc_ref, nuc_start, nuc_alt)
             aa_pos = int((start - feature_dict[feature][0]) / 3) + 1
+            if include_protein:
+                feature, aa_pos = translate_to_protein_if_possible(feature, aa_pos, feature_dict)
             #print(start, end, ref_allele, query_allele, aa_pos, feature)
             return "%s:%s%i%s" % (feature, ref_allele, aa_pos, query_allele)
     return "nuc:%s%i%s" % (nuc_ref, nuc_start, nuc_alt)
 
 
-def define_mutations(list_variants, feature_dict, reference_seq):
+def translate_to_protein_if_possible(cds, aa_start, feature_dict):
+    if not cds.startswith("orf"):
+        return cds, aa_start
+
+    for feature in feature_dict:
+        if len(feature_dict[feature]) < 3:
+            continue  # only want nsp definitions
+        if feature_dict[feature][2] == cds:
+            if feature_dict[feature][0] <= aa_start <= feature_dict[feature][1]:
+                return feature, aa_start-feature_dict[feature][0]+1
+    return cds, aa_start
+
+def define_mutations(list_variants, feature_dict, reference_seq, include_protein=False):
     merged_list = []
     if not list_variants:
         return merged_list
@@ -184,7 +207,7 @@ def define_mutations(list_variants, feature_dict, reference_seq):
             elif new[3]:
                 current[3] = new[3]
         elif current[0] != "":
-            var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq)
+            var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein)
             if freq:
                 merged_list.append("%s:%s" % (var, freq))
             else:
@@ -193,7 +216,7 @@ def define_mutations(list_variants, feature_dict, reference_seq):
         else:
             current = new
     if current[0] != "":
-        var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq)
+        var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein)
         if freq:
             merged_list.append("%s:%s" % (var, freq))
         else:
@@ -222,7 +245,7 @@ def write_constellation(prefix, group, list_variants, list_intermediates, list_a
 
 
 def extract_definitions(in_variants, in_groups, group_column, index_column, reference_json, prefix, subset,
-                        threshold_common, threshold_intermediate, outgroup_file):
+                        threshold_common, threshold_intermediate, outgroup_file, include_protein):
     if not in_groups:
         in_groups = in_variants
 
@@ -237,6 +260,7 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
     group_dict = get_group_dict(in_groups, group_column, index_column, groups_to_get)
 
     reference_seq, feature_dict = load_feature_coordinates(reference_json)
+    feature_dict = update_feature_dict(feature_dict)
 
     var_dict = {}
     outgroup_var_dict = {}
@@ -281,9 +305,9 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
         if group in outgroup_var_dict:
             outgroup_common, outgroup_intermediate = get_common_mutations(outgroup_var_dict[group], min_occurance=1, threshold_common=threshold_common, threshold_intermediate=threshold_intermediate)
             common, ancestral = subtract_outgroup(common, outgroup_common)
-        nice_common = define_mutations(common, feature_dict, reference_seq)
-        nice_intermediate = define_mutations(intermediate, feature_dict, reference_seq)
-        nice_ancestral = define_mutations(ancestral, feature_dict, reference_seq)
+        nice_common = define_mutations(common, feature_dict, reference_seq, include_protein)
+        nice_intermediate = define_mutations(intermediate, feature_dict, reference_seq, include_protein)
+        nice_ancestral = define_mutations(ancestral, feature_dict, reference_seq, include_protein)
         write_constellation(prefix, group, nice_common, nice_intermediate, nice_ancestral)
 
 
