@@ -214,11 +214,9 @@ def subtract_outgroup(common, outgroup_common):
 
 def write_constellation(prefix, group, list_variants, list_intermediates, list_ancestral):
     group_dict = {"name": group, "sites": list_variants, "intermediate": list_intermediates,
-                  "rules": {"min_alt": int((len(list_variants) + 1) / 4), "max_ref": int((len(list_variants) - 1) / 4)}}
+                  "rules": {"min_alt": max(len(list_variants) - 8, min(len(list_variants), 5)), "max_ref": 3}}
     if list_ancestral:
         group_dict["ancestral"] = list_ancestral
-        group_dict["rules"]["min_alt"] += int((len(list_ancestral)+1)/4)
-        group_dict["rules"]["max_ref"] += int((len(list_ancestral)-1)/4)
     with open('%s/%s.json' % (prefix, group), 'w') as outfile:
         json.dump(group_dict, outfile, indent=4)
 
