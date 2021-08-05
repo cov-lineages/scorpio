@@ -5,6 +5,7 @@ import csv
 import operator
 import argparse
 import json
+import logging
 from Bio.Seq import Seq
 from operator import itemgetter
 
@@ -65,12 +66,12 @@ def get_group_dict(in_variants, group_column, index_column, subset):
                 if subset and row[group_column] not in subset:
                     continue
                 if row[index_column] in group_dict:
-                    print("%s is a duplicate in group CSV, keeping first")
+                    logging.warning("%s is a duplicate in group CSV, keeping first")
                 else:
                     group_dict[row[index_column]] = row[group_column]
                     groups.add(row[group_column])
 
-    print("Found", len(groups), "groups")
+    logging.info("Found %d groups" % len(groups))
 
     return group_dict
 
@@ -245,14 +246,14 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
     with open(in_variants, 'r', newline = '') as csv_in:
         reader = csv.DictReader(csv_in, delimiter=",", quotechar='\"', dialect = "unix")
         if index_column not in reader.fieldnames:
-            print("Index column %s not found in %s" % (index_column, in_variants))
+            logging.warning("Index column %s not found in %s" % (index_column, in_variants))
 
         if "nucleotide_variants" in reader.fieldnames:
             var_column = "nucleotide_variants"
         elif "nucleotide_mutations" in reader.fieldnames:
             var_column = "nucleotide_mutations"
         else:
-            print("No nucleotide_variants or nucleotide_mutations columns found")
+            logging.warning("No nucleotide_variants or nucleotide_mutations columns found")
             sys.exit(-1)
 
         for row in reader:
@@ -270,7 +271,7 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
                     for lineage in outgroup_dict[group_dict[index]]:
                         update_var_dict(outgroup_var_dict, lineage, variants)
             else:
-                print("Index column or variants column not in row", row)
+                logging.warning("Index column or variants column not in row", row)
 
     #print("outgroup_var_dict", outgroup_var_dict)
     #print("var_dict", var_dict)
