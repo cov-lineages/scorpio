@@ -579,7 +579,7 @@ def count_and_classify(record_seq, variant_list, rules):
         return counts, counts_follow_rules(counts, rules)
 
 
-def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_char="X"):
+def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_char="X",constellation_count_dict=None):
     barcode_list = []
     counts = {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0}
 
@@ -587,6 +587,10 @@ def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_
         call, query_allele = call_variant_from_fasta(record_seq, var, ins_char, oth_char)
         # print(var, call, query_allele)
         counts[call] += 1
+        if constellation_count_dict and "constellations" in var:
+            for constellation in var["constellations"]:
+                constellation_count_dict[constellation][call] += 1
+
         if ref_char is not None and call == 'ref':
             barcode_list.append(str(ref_char))
         else:
@@ -595,11 +599,26 @@ def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_
     counts['support'] = round(counts['alt'] / float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']), 4)
     counts['conflict'] = round(counts['ref'] / float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']), 4)
 
-    return barcode_list, counts
+    return barcode_list, counts, constellation_count_dict
 
+
+def combine_constellations(constellation_dict):
+    variant_dict = {}
+    constellation_count_dict = {}
+    for constellation in constellation_dict:
+        constellation_count_dict[constellation] = {"total": len(constellation_dict[constellation]), 'ref': 0, 'alt': 0,
+                                                   'ambig': 0, 'oth': 0}
+        for variant in constellation_dict[constellation]:
+            if variant["name"] in variant_dict:
+                variant_dict[variant["name"]]["constellations"].append(constellation)
+            else:
+                variant_dict[variant["name"]] = variant
+                variant_dict[variant["name"]]["constellations"] = [constellation]
+    return {"union": variant_dict.values()}, constellation_count_dict
 
 def type_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json, ref_char=None,
-                        output_counts=False, label=None, append_genotypes=False, mutations_list=None, dry_run=False):
+                        output_counts=False, label=None, append_genotypes=False, mutations_list=None, dry_run=False,
+                        combination=False):
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
     constellation_dict = {}
@@ -611,7 +630,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
             continue
         if len(variants) > 0:
             constellation_dict[constellation] = variants
-            logging.info("Found file %s for constellation %s containing %i variants" % (
+            logging.info("Found file %s for constellation %s containing %i defining mutations" % (
                     constellation_file, constellation, len([v["name"] for v in variants])))
         else:
             logging.warning("Warning: %s is not a valid constellation file - ignoring" % constellation_file)
@@ -630,12 +649,22 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
             new_constellation = "%s+%s" %(constellation, '|'.join(mutations_list))
             constellation_dict[new_constellation] = constellation_dict[constellation] + mutation_variants
             del constellation_dict[constellation]
-
         else:
             constellation_dict["mutations"] = mutation_variants
 
     if dry_run:
         return
+
+    if combination:
+        constellation_dict, constellation_count_dict = combine_constellations(constellation_dict)
+    else:
+        constellation_count_dict = None
+
+    logging.info("\n")
+    logging.info("Have %i constellations to type: %s" % (len(constellation_dict), list(constellation_dict.keys())))
+    if constellation_count_dict:
+        logging.info("Have %i candidate constellations to collect counts: %s" % (len(constellation_count_dict),
+                                                                                 list(constellation_count_dict.keys())))
 
     variants_out = None
     if len(constellation_dict) > 1 or not (output_counts or append_genotypes):
@@ -655,6 +684,8 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
                 columns.append("ref_count,alt_count,ambig_count,other_count,support,conflict")
             if append_genotypes:
                 columns.extend([var["name"] for var in constellation_dict[constellation]])
+            if combination:
+                columns.append("notes")
             counts_out[constellation].write("%s\n" % ','.join(columns))
 
     with open(in_fasta, "r") as f:
@@ -666,7 +697,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
             out_list = [record.id]
             for constellation in constellation_dict:
-                barcode_list, counts = generate_barcode(record.seq, constellation_dict[constellation], ref_char)
+                barcode_list, counts, constellation_count_dict = generate_barcode(record.seq, constellation_dict[constellation], ref_char, constellation_count_dict=constellation_count_dict)
                 if output_counts or append_genotypes:
                     columns = [record.id]
                     if output_counts:
@@ -674,6 +705,20 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
                                        counts['ambig'], counts['oth'], counts['support'], counts['conflict']))
                     if append_genotypes:
                         columns.extend(barcode_list)
+                    if combination:
+                        scores = {}
+                        for candidate in constellation_count_dict:
+                            if constellation_count_dict[candidate]["alt"] > 0:
+                                summary = "%s:%i|%i|%i|%i" % (
+                                candidate, constellation_count_dict[candidate]["ref"],
+                                constellation_count_dict[candidate]["alt"],
+                                constellation_count_dict[candidate]["ambig"],
+                                constellation_count_dict[candidate]["oth"])
+                                score = float(constellation_count_dict[candidate]["alt"]) / \
+                                        constellation_count_dict[candidate]["total"]
+                                scores[score] = summary
+                        sorted_scores = sorted(scores, key=lambda x: float(x), reverse=True)
+                        columns.append("; ".join([scores[score] for score in sorted_scores]))
                     counts_out[constellation].write("%s\n" % ','.join(columns))
                 out_list.append(''.join(barcode_list))
             if variants_out:
@@ -796,7 +841,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                 out_entries.append(",,,,,,")
 
             if mutations_list:
-                barcode_list, counts = generate_barcode(record.seq, mutation_variants)
+                barcode_list, counts, ignore = generate_barcode(record.seq, mutation_variants)
                 out_entries.extend(barcode_list)
 
             variants_out.write("%s\n" % ",".join(out_entries))
@@ -811,7 +856,7 @@ def list_constellations(list_constellation_files, constellation_names, reference
 
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
-    list_of_constellations = []
+    list_of_constellations = set()
     for constellation_file in list_constellation_files:
         constellation, variants, ignore, mrca_lineage, incompatible_lineage_calls = parse_variants_in(reference_seq, features_dict, constellation_file, constellation_names, label=label)
         if not constellation:
@@ -819,9 +864,10 @@ def list_constellations(list_constellation_files, constellation_names, reference
         if constellation_names and constellation not in constellation_names:
             continue
         if len(variants) > 0 and mrca_lineage:
-            list_of_constellations.append(mrca_lineage)
+            list_of_constellations.add(constellation)
+            list_of_constellations.add(mrca_lineage)
         elif len(variants) > 0:
-            list_of_constellations.append(constellation)
+            list_of_constellations.add(constellation)
     print("\n".join(list_of_constellations))
 
 def parse_args():
