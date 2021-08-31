@@ -552,8 +552,9 @@ def var_follows_rules(call, rule):
         return call == rule_call
 
 def counts_follow_rules(counts, rules):
-    # rules allowed include "max_ref", "min_alt"
+    # rules allowed include "max_ref", "min_alt", "min_snp_alt"
     is_rule_follower = True
+    notes = []
     for rule in rules:
         if ":" in rule:
             continue
@@ -561,25 +562,48 @@ def counts_follow_rules(counts, rules):
             rule_parts = rule.split("_")
             if len(rule_parts) <= 1:
                 continue
-            if rule_parts[0] == "min" and counts[rule_parts[1]] < rules[rule]:
-                is_rule_follower = False
-            elif rule_parts[0] == "max" and counts[rule_parts[1]] > rules[rule]:
-                is_rule_follower = False
-            else:
-                counts["rules"] += 1
+            elif len(rule_parts) == 2:
+                if rule_parts[0] == "min" and counts[rule_parts[1]] < rules[rule]:
+                    is_rule_follower = False
+                elif rule_parts[0] == "max" and counts[rule_parts[1]] > rules[rule]:
+                    is_rule_follower = False
+                else:
+                    counts["rules"] += 1
+            elif len(rule_parts) == 3:
+                part = None
+                if rule_parts[1] in ["substitution", "snp"]:
+                    part = "substitution"
+                elif rule_parts[1] in ["indel"]:
+                    part = "indel"
+                if not part:
+                    is_rule_follower = False
+                elif rule_parts[0] == "min" and counts[part][rule_parts[2]] < rules[rule]:
+                    is_rule_follower = False
+                    notes.append("%s_%s_count=%i is less than %i" % (part, rule_parts[2], counts[part][rule_parts[2]], rules[rule]))
+                elif rule_parts[0] == "max" and counts[part][rule_parts[2]] > rules[rule]:
+                    is_rule_follower = False
+                    notes.append("%s_%s_count=%i is more than %i" % (part, rule_parts[2], counts[part][rule_parts[2]], rules[rule]))
+                else:
+                    counts["rules"] += 1
         else:
             logging.warning("Warning: Ignoring rule %s:%s" % (rule, str(rules[rule])))
-    return is_rule_follower
+    return is_rule_follower, ";".join(notes)
 
 def count_and_classify(record_seq, variant_list, rules):
     assert rules is not None
-    counts = {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0, 'rules':0}
+    counts = {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0, 'rules': 0,
+              'substitution': {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0},
+              'indel': {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0}}
     is_rule_follower = True
 
     for var in variant_list:
         call, query_allele = call_variant_from_fasta(record_seq, var)
         #print(var, call, query_allele)
         counts[call] += 1
+        if var['type'] in ["aa", "snp"]:
+            counts["substitution"][call] += 1
+        elif var['type'] in ["ins", "del"]:
+            counts["indel"][call] += 1
         if var["name"] in rules:
             if var_follows_rules(call, rules[var["name"]]):
                 counts['rules'] += 1
@@ -590,9 +614,10 @@ def count_and_classify(record_seq, variant_list, rules):
     counts['conflict'] = round(counts['ref'] /float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']),4)
 
     if not is_rule_follower:
-        return counts, False
+        return counts, False, ""
     else:
-        return counts, counts_follow_rules(counts, rules)
+        call, note = counts_follow_rules(counts, rules)
+        return counts, call, note
 
 
 def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_char="X",constellation_count_dict=None):
@@ -888,15 +913,15 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
         return
 
     variants_out = open(out_csv, "w")
-    columns = ["query","constellations","mrca_lineage"]
+    columns = ["query", "constellations", "mrca_lineage"]
     if list_incompatible:
         columns.append("incompatible_lineages")
     if long and not call_all:
         columns.extend(["ref_count","alt_count","ambig_count","other_count","rule_count","support","conflict"])
-    columns.append("name")
+    columns.append("constellation_name")
     if mutations_list:
         columns.extend(mutations_list)
-    variants_out.write("%s\n" %",".join(columns))
+    variants_out.write("%s\n" % ",".join(columns))
 
     counts_out = {}
     if output_counts:
@@ -908,7 +933,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                 clean_name = re.sub("[^a-zA-Z0-9_\-.]", "_", constellation_name)
                 counts_out[constellation_name] = open("%s.%s_counts.csv" % (out_csv.replace(".csv", ""), clean_name), "w")
                 counts_out[constellation_name].write("query,ref_count,alt_count,ambig_count,other_count,rule_count,support,"
-                                                "conflict,call,name\n")
+                                                "conflict,call,constellation_name,note\n")
 
     with open(in_fasta, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
@@ -927,7 +952,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                 constellation_name = name_dict[constellation]
                 if not constellation_name:
                     continue
-                counts, call = count_and_classify(record.seq,
+                counts, call, note = count_and_classify(record.seq,
                                                   constellation_dict[constellation],
                                                   rule_dict[constellation])
                 if call:
@@ -942,14 +967,12 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                         best_support = counts['support']
                         best_conflict = counts['conflict']
                         best_counts = counts
-                elif len(constellation_dict) == 1:
-                    best_counts = counts
 
                 if output_counts:
                     counts_out[constellation_name].write(
-                        "%s,%i,%i,%i,%i,%i,%f,%f,%s,%s\n" % (record.id, counts['ref'], counts['alt'], counts['ambig'],
+                        "%s,%i,%i,%i,%i,%i,%f,%f,%s,%s,%s\n" % (record.id, counts['ref'], counts['alt'], counts['ambig'],
                                                        counts['oth'], counts['rules'], counts['support'],
-                                                          counts['conflict'], call, constellation))
+                                                          counts['conflict'], call, constellation, note))
             if not call_all and best_constellation:
                 lineages.append(name_dict[best_constellation])
                 names.append(best_constellation)
