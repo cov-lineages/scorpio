@@ -250,7 +250,7 @@ def test_count_and_classify():
                      {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "rules": 3, "support": 0.8333, "conflict": 0.0},
                      {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "rules": 0, "support": 0.1667, "conflict": 0.0}]
     for i in range(len(seqs)):
-        counts, classify = count_and_classify(seqs[i], variants, rules)
+        counts, classify, note = count_and_classify(seqs[i], variants, rules)
         print(i, counts, classify)
         assert classify == expect_classify[i]
         assert counts == expect_counts[i]
