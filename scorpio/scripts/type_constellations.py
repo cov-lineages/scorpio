@@ -286,8 +286,11 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
         rules = json_dict["rules"]
 
     in_json.close()
+    sorted_variants = sorted(variant_list, key=lambda x: int(x["ref_start"]))
+    for var in sorted_variants:
+        print(var)
 
-    return variant_list, name, output_name, rules, mrca_lineage, incompatible_lineage_calls
+    return sorted_variants, name, output_name, rules, mrca_lineage, incompatible_lineage_calls
 
 
 def parse_csv_in(refseq, features_dict, variants_file, constellation_names=None, ignore_fails=False):
@@ -334,7 +337,8 @@ def parse_csv_in(refseq, features_dict, variants_file, constellation_names=None,
         rules = {}
         for var in compulsory:
             rules[var] = "alt"
-    return variant_list, name, rules
+    sorted_variants = sorted(variant_list, key=lambda x: int(x["ref_start"]))
+    return sorted_variants, name, rules
 
 
 def parse_textfile_in(refseq, features_dict, variants_file, constellation_names=None, ignore_fails=False):
@@ -357,8 +361,9 @@ def parse_textfile_in(refseq, features_dict, variants_file, constellation_names=
                 record = variant_to_variant_record(l, refseq, features_dict, ignore_fails=ignore_fails)
                 if record != {}:
                     variant_list.append(record)
+    sorted_variants = sorted(variant_list, key=lambda x: int(x["ref_start"]))
 
-    return variant_list, name
+    return sorted_variants, name
 
 
 def parse_variants_in(refseq, features_dict, variants_file, constellation_names=None, include_ancestral=False, label=None, ignore_fails=False):
@@ -728,63 +733,57 @@ def combine_constellations_by_name(constellation_dict, name_dict):
                     new_constellation_dict[constellation_name].append(variant)
     return new_constellation_dict
 
+def get_number_switches(barcode_list, ref_char="-", ambig_char = "X"):
+    previous = None
+    current = None
+    number_switches = 0
+    len_non_ambig_barcode = 0
+    for letter in barcode_list:
+        if letter == ref_char:
+            current = 1
+        elif letter == ambig_char:
+            continue
+        else:
+            current = 0
 
-def position_score(position, A, B, query):
-    if (query == "A" and A[position] == 1) or (query == "B" and B[position] == 1):
-        return 1
-    elif query not in ["A", "B"]:
-        return 2
-    else:
-        return math.inf
+        len_non_ambig_barcode += 1
+
+        if previous == None:
+            previous = current
+            continue
+
+        if current != previous:
+            number_switches += 1
+            previous = current
+
+    if number_switches > 1:
+        number_switches -= 1
+
+    return number_switches,len_non_ambig_barcode
+
+def prob_number_errors_or_fewer(counts):
+    # H0: missing is due to errors
+    # H1: missing is due to recombination
+    prob = counts["substitution"]["alt"]^prob_snp_error + prob_del_error * counts["indel"]["alt"]
+
+def prob_number_switches_or_fewer(number_switches, len_non_ambig_barcode):
+    # H0: sample is random draws from mixture
+    # H1: sample is a due to recombination
 
 
-def transition_score(previous, new):
-    if previous == new:
-        return 0
-    elif new not in ["A", "B"]:
-        return 2
-    else:
-        return 1
+
+def get_interspersion(top_scoring, counts, barcode_list, ref_char="-", ambig_char = "X"):
+    number_switches, len_non_ambig_barcode = get_number_switches(barcode_list, ref_char="-", ambig_char = "X"
 
 
-def interspersion_at_position(position, A, B, query, memo):
-    if position == 0:
-        return position_score(0,A,B,query)
-
-    if (position, A, B, query) in memo:
-        return memo[(position, A, B, query)]
-
-    score = min(transition_score("A", query) + position_score(position-1, A, B, "A"),
-                transition_score("B", query) + position_score(position-1, A, B, "B"),
-                transition_score("other", query) + position_score(position-1, A, B, "other"))
-    memo[(position, A, B, query)] = score
-    print(position, query, score)
-    return memo[(position, A, B, query)]
-
-
-def get_interspersion(sorted_alt_sites, top_scoring, second_scoring):
-    # create a memo dictionary
-    memo = {}
-
-    A = [1 if top_scoring in sorted_alt_sites[pos] else 0 for pos in sorted_alt_sites if top_scoring in sorted_alt_sites[pos]]
-    B = [1 if second_scoring in sorted_alt_sites[pos] else 0 for pos in sorted_alt_sites if top_scoring in sorted_alt_sites[pos]]
-
-    print(A)
-    print(B)
-
-    score = min(interspersion_at_position(len(sorted_alt_sites), A, B, "A", memo),
-                interspersion_at_position(len(sorted_alt_sites), A, B, "B", memo),
-                interspersion_at_position(len(sorted_alt_sites), A, B, "other", memo))
-
-    return score
+    # H0: missing is due to sequencing errors
+    # H1: sample is a random mixture of
+    return
 
 
 def type_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json, ref_char=None,
                         output_counts=False, label=None, append_genotypes=False, mutations_list=None, dry_run=False,
                         combination=False, interspersion=False):
-    if interspersion:
-        combination = True
-
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
     constellation_dict, name_dict, rule_dict, mrca_lineage_dict, incompatible_dict = load_constellations(list_constellation_files,
@@ -876,10 +875,6 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
                                 scores[score] = summary
                         sorted_scores = sorted(scores, key=lambda x: float(x), reverse=True)
                         columns.append("; ".join([scores[score] for score in sorted_scores]))
-                        if interspersion:
-                            top_scoring = scores[sorted_scores[0]]
-                            second_scoring = scores[sorted_scores[1]]
-                            score = get_interspersion(sorted_alt_sites, top_scoring, second_scoring)
                     counts_out[constellation].write("%s\n" % ','.join(columns))
                 out_list.append(''.join(barcode_list))
             if variants_out:
@@ -894,7 +889,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
 def classify_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json,
                             output_counts=False, call_all=False, long=False, label=None, list_incompatible=False,
-                            mutations_list=None, dry_run=False):
+                            mutations_list=None, dry_run=False, interspersion=False):
 
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
@@ -948,6 +943,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             best_support = 0
             best_conflict = 1
             best_counts = None
+            scores = {}
             for constellation in constellation_dict:
                 constellation_name = name_dict[constellation]
                 if not constellation_name:
@@ -968,6 +964,12 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                         best_conflict = counts['conflict']
                         best_counts = counts
 
+                if interspersion:
+                    if counts["alt"] > 1:
+                        summary = constellation
+                        score = counts["support"]
+                        scores[score] = summary
+
                 if output_counts:
                     counts_out[constellation_name].write(
                         "%s,%i,%i,%i,%i,%i,%f,%f,%s,%s,%s\n" % (record.id, counts['ref'], counts['alt'], counts['ambig'],
@@ -978,6 +980,11 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                 names.append(best_constellation)
 
             out_entries = [record.id, "|".join(lineages), "|".join([mrca_lineage_dict[n] for n in names])]
+            if interspersion:
+                sorted_scores = sorted(scores, key=lambda x: float(x), reverse=True)
+                top_scoring = scores[sorted_scores[0]]
+                barcode_list, counts, constellation_count_dict, sorted_alt_sites = generate_barcode(record.seq, constellation_dict[constellation], ref_char="-")
+                get_interspersion(top_scoring, barcode_list)
             if list_incompatible:
                 out_entries.append("|".join([incompatible_dict[n] for n in names]))
             if long and best_counts is not None:

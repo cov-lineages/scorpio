@@ -245,10 +245,11 @@ def test_count_and_classify():
 
     rules = {"min_alt": 1, "max_ref": 1, "snp2": "alt"}
     expect_classify = [False, False, True, False]
-    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "rules": 0, "support": 0.0, "conflict": 0.8333},
-                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "rules": 0, "support": 0.6667, "conflict": 0.1667},
-                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "rules": 3, "support": 0.8333, "conflict": 0.0},
-                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "rules": 0, "support": 0.1667, "conflict": 0.0}]
+    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "rules": 0, 'substitution': {'ref': 4, 'alt': 0, 'ambig': 0, 'oth': 0}, 'indel': {'ref': 1, 'alt': 0, 'ambig': 0, 'oth': 1}, "support": 0.0, "conflict": 0.8333},
+                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "rules": 0, 'substitution': {'ref': 1, 'alt': 3, 'ambig': 0, 'oth': 0}, 'indel': {'ref': 0, 'alt': 1, 'ambig': 0, 'oth': 1}, "support": 0.6667, "conflict": 0.1667},
+                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "rules": 3, 'substitution': {'ref': 0, 'alt': 4, 'ambig': 0, 'oth': 0}, 'indel': {'ref': 0, 'alt': 1, 'ambig': 0, 'oth': 1}, "support": 0.8333, "conflict": 0.0},
+                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "rules": 0, 'substitution': {'ref': 0, 'alt': 1, 'ambig': 0, 'oth': 3}, 'indel': {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 2}, "support": 0.1667, "conflict": 0.0}]
+
     for i in range(len(seqs)):
         counts, classify, note = count_and_classify(seqs[i], variants, rules)
         print(i, counts, classify)
