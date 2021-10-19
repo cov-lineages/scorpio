@@ -141,7 +141,7 @@ def test_variant_to_variant_record():
 
 def test_parse_json_in():
     variants_file = "%s/lineage_X.json" % data_dir
-    variant_list, name, rules, mrca_lineage, incompatible_lineages = parse_json_in(refseq, features_dict, variants_file)
+    variant_list, name, output_name, rules, mrca_lineage, incompatible_lineages, parent_lineage, lineage_name  = parse_json_in(refseq, features_dict, variants_file)
     assert len(variant_list) == 24
     assert len([v for v in variant_list if v["type"] == "snp"]) == 6
     assert len([v for v in variant_list if v["type"] == "del"]) == 3
@@ -185,7 +185,7 @@ def test_parse_variants_in():
 
     results = []
     for i in range(len(in_files)):
-        name, variant_list, rule_dict, mrca_lineage, incompatible_lineages = parse_variants_in(refseq, features_dict, in_files[i])
+        name, output_name, variant_list, rule_dict, mrca_lineage, incompatible_lineages, parent_lineage, lineage_name = parse_variants_in(refseq, features_dict, in_files[i])
         assert expect_names[i] == name
         assert expect_rules[i] == rule_dict
         results.append(variant_list)
@@ -245,12 +245,13 @@ def test_count_and_classify():
 
     rules = {"min_alt": 1, "max_ref": 1, "snp2": "alt"}
     expect_classify = [False, False, True, False]
-    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "rules": 0, "support": 0.0, "conflict": 0.8333},
-                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "rules": 0, "support": 0.6667, "conflict": 0.1667},
-                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "rules": 3, "support": 0.8333, "conflict": 0.0},
-                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "rules": 0, "support": 0.1667, "conflict": 0.0}]
+    expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "rules": 0, 'substitution': {'ref': 4, 'alt': 0, 'ambig': 0, 'oth': 0}, 'indel': {'ref': 1, 'alt': 0, 'ambig': 0, 'oth': 1}, "support": 0.0, "conflict": 0.8333},
+                     {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "rules": 0, 'substitution': {'ref': 1, 'alt': 3, 'ambig': 0, 'oth': 0}, 'indel': {'ref': 0, 'alt': 1, 'ambig': 0, 'oth': 1}, "support": 0.6667, "conflict": 0.1667},
+                     {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "rules": 3, 'substitution': {'ref': 0, 'alt': 4, 'ambig': 0, 'oth': 0}, 'indel': {'ref': 0, 'alt': 1, 'ambig': 0, 'oth': 1}, "support": 0.8333, "conflict": 0.0},
+                     {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "rules": 0, 'substitution': {'ref': 0, 'alt': 1, 'ambig': 0, 'oth': 3}, 'indel': {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 2}, "support": 0.1667, "conflict": 0.0}]
+
     for i in range(len(seqs)):
-        counts, classify = count_and_classify(seqs[i], variants, rules)
+        counts, classify, note = count_and_classify(seqs[i], variants, rules)
         print(i, counts, classify)
         assert classify == expect_classify[i]
         assert counts == expect_counts[i]
@@ -276,23 +277,23 @@ def test_generate_barcode():
                      {"ref": 0, "alt": 1, "ambig": 0, "oth": 5, "support": 0.1667, "conflict": 0.0}]
 
     for i in range(len(seqs)):
-        barcode_list, counts = generate_barcode(seqs[i], variants, ref_char="-", ins_char="?", oth_char="X")
+        barcode_list, counts, constellation_count_dict, sorted_alt_constellations = generate_barcode(seqs[i], variants, ref_char="-", ins_char="?", oth_char="X")
         barcode = ''.join(barcode_list)
         print(i, barcode, counts)
         assert barcode == expect_barcode_dash[i]
         assert counts == expect_counts[i]
 
-        barcode_list, counts = generate_barcode(seqs[i], variants, ref_char=None, ins_char="?", oth_char="X")
+        barcode_list, counts, constellation_count_dict, sorted_alt_constellations = generate_barcode(seqs[i], variants, ref_char=None, ins_char="?", oth_char="X")
         barcode = ''.join(barcode_list)
         print(i, barcode, counts)
         assert barcode == expect_barcode_ref[i]
 
-        barcode_list, counts = generate_barcode(seqs[i], variants, ref_char=None, ins_char="?", oth_char=None)
+        barcode_list, counts, constellation_count_dict, sorted_alt_constellations = generate_barcode(seqs[i], variants, ref_char=None, ins_char="?", oth_char=None)
         barcode = ''.join(barcode_list)
         print(i, barcode, counts)
         assert barcode == expect_barcode_ref_oth[i]
 
-        barcode_list, counts = generate_barcode(seqs[i], variants, ref_char="-", ins_char="$", oth_char="X")
+        barcode_list, counts, constellation_count_dict, sorted_alt_constellations = generate_barcode(seqs[i], variants, ref_char="-", ins_char="$", oth_char="X")
         barcode = ''.join(barcode_list)
         print(i, barcode, counts)
         assert barcode == expect_barcode_ins[i]

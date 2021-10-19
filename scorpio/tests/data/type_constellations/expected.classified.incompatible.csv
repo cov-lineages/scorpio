@@ -1,8 +1,8 @@
-query,constellations,mrca_lineage,incompatible_lineages
-Flatland01,Lineage_X,B.1.1.7,A|B.1.351
-Flatland02,Lineage_X,B.1.1.7,A|B.1.351
-Flatland03,Lineage_X,B.1.1.7,A|B.1.351
-Flatland04,,,
-Flatland05,,,
-Flatland06,,,
-Reference,,,
+query,constellations,mrca_lineage,incompatible_lineages,constellation_name
+Flatland01,Lineage_X,B.1.1.7,A|B.1.351,Lineage_X
+Flatland02,Lineage_X,B.1.1.7,A|B.1.351,Lineage_X
+Flatland03,Lineage_X,B.1.1.7,A|B.1.351,Lineage_X
+Flatland04,,,,
+Flatland05,,,,
+Flatland06,,,,
+Reference,,,,
