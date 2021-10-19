@@ -141,7 +141,7 @@ def test_variant_to_variant_record():
 
 def test_parse_json_in():
     variants_file = "%s/lineage_X.json" % data_dir
-    variant_list, name, output_name, rules, mrca_lineage, incompatible_lineages = parse_json_in(refseq, features_dict, variants_file)
+    variant_list, name, output_name, rules, mrca_lineage, incompatible_lineages, parent_lineage, lineage_name  = parse_json_in(refseq, features_dict, variants_file)
     assert len(variant_list) == 24
     assert len([v for v in variant_list if v["type"] == "snp"]) == 6
     assert len([v for v in variant_list if v["type"] == "del"]) == 3
@@ -185,7 +185,7 @@ def test_parse_variants_in():
 
     results = []
     for i in range(len(in_files)):
-        name, output_name, variant_list, rule_dict, mrca_lineage, incompatible_lineages = parse_variants_in(refseq, features_dict, in_files[i])
+        name, output_name, variant_list, rule_dict, mrca_lineage, incompatible_lineages, parent_lineage, lineage_name = parse_variants_in(refseq, features_dict, in_files[i])
         assert expect_names[i] == name
         assert expect_rules[i] == rule_dict
         results.append(variant_list)

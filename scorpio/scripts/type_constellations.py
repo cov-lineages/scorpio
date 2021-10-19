@@ -233,6 +233,8 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
     rules = None
     mrca_lineage = ""
     incompatible_lineage_calls = ""
+    parent_lineage = None
+    lineage_name = None
 
     in_json = open(variants_file, 'r')
     json_dict = json.load(in_json, strict=False)
@@ -246,6 +248,10 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
                 mrca_lineage = json_dict[json_dict["type"]]["mrca_lineage"]
         if "incompatible_lineage_calls" in json_dict[json_dict["type"]]:
             incompatible_lineage_calls = "|".join(json_dict[json_dict["type"]]["incompatible_lineage_calls"])
+        if "parent_lineage" in json_dict[json_dict["type"]]:
+            parent_lineage = json_dict[json_dict["type"]]["parent_lineage"]
+        if "lineage_name" in json_dict[json_dict["type"]]:
+            lineage_name = json_dict[json_dict["type"]]["lineage_name"]
 
     if "name" in json_dict:
         name = json_dict["name"]
@@ -264,9 +270,9 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
 
 
     if not name:
-        return variant_list, name, output_name, rules, mrca_lineage, incompatible_lineage_calls
+        return variant_list, name, output_name, rules, mrca_lineage, incompatible_lineage_calls, parent_lineage, lineage_name
     if constellation_names and name not in constellation_names and output_name not in constellation_names:
-        return variant_list, name, output_name, rules, mrca_lineage, incompatible_lineage_calls
+        return variant_list, name, output_name, rules, mrca_lineage, incompatible_lineage_calls, parent_lineage, lineage_name
 
     logging.info("\n")
     logging.info("Parsing constellation JSON file %s" % variants_file)
@@ -290,7 +296,7 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
     for var in sorted_variants:
         print(var)
 
-    return sorted_variants, name, output_name, rules, mrca_lineage, incompatible_lineage_calls
+    return sorted_variants, name, output_name, rules, mrca_lineage, incompatible_lineage_calls, parent_lineage, lineage_name
 
 
 def parse_csv_in(refseq, features_dict, variants_file, constellation_names=None, ignore_fails=False):
@@ -389,9 +395,11 @@ def parse_variants_in(refseq, features_dict, variants_file, constellation_names=
     output_name = None
     mrca_lineage = ""
     incompatible_lineage_calls = ""
+    parent_lineage = None
+    lineage_name = None
 
     if variants_file.endswith(".json"):
-        variant_list, name, output_name, rule_dict, mrca_lineage, incompatible_lineage_calls = parse_json_in(refseq, features_dict, variants_file, constellation_names, include_ancestral=include_ancestral,label=label,ignore_fails=ignore_fails)
+        variant_list, name, output_name, rule_dict, mrca_lineage, incompatible_lineage_calls, parent_lineage, lineage_name = parse_json_in(refseq, features_dict, variants_file, constellation_names, include_ancestral=include_ancestral,label=label,ignore_fails=ignore_fails)
     elif variants_file.endswith(".csv"):
         variant_list, name, rule_dict = parse_csv_in(refseq, features_dict, variants_file, constellation_names, ignore_fails=ignore_fails)
         output_name = name
@@ -400,7 +408,7 @@ def parse_variants_in(refseq, features_dict, variants_file, constellation_names=
         variant_list, name = parse_textfile_in(refseq, features_dict, variants_file, constellation_names, ignore_fails=ignore_fails)
         output_name = name
 
-    return name, output_name, variant_list, rule_dict, mrca_lineage, incompatible_lineage_calls
+    return name, output_name, variant_list, rule_dict, mrca_lineage, incompatible_lineage_calls, parent_lineage, lineage_name
 
 
 def parse_mutations_in(mutations_file):
@@ -658,14 +666,18 @@ def load_constellations(list_constellation_files, constellation_names, reference
     rule_dict = {}
     mrca_lineage_dict = {}
     incompatible_dict = {}
+    parent_lineage_dict = {}
+    lineage_name_dict = {}
     for constellation_file in list_constellation_files:
-        constellation, output_name, variants, rules, mrca_lineage, incompatible_lineage_calls = parse_variants_in(reference_seq,
-                                                                                                     features_dict,
-                                                                                                     constellation_file,
-                                                                                                     constellation_names,
-                                                                                                     include_ancestral=include_ancestral,
-                                                                                                     label=label,
-                                                                                                     ignore_fails=ignore_fails)
+        constellation, output_name, variants, rules, mrca_lineage, \
+        incompatible_lineage_calls, parent_lineage, lineage_name = \
+            parse_variants_in(reference_seq,
+                              features_dict,
+                              constellation_file,
+                              constellation_names,
+                              include_ancestral=include_ancestral,
+                              label=label,
+                              ignore_fails=ignore_fails)
         if not constellation:
             continue
         if constellation_names and constellation not in constellation_names and output_name not in constellation_names:
@@ -685,10 +697,14 @@ def load_constellations(list_constellation_files, constellation_names, reference
                 logging.info("Rules %s" % rule_dict[constellation])
             mrca_lineage_dict[constellation] = mrca_lineage
             incompatible_dict[constellation] = incompatible_lineage_calls
+            if parent_lineage:
+                parent_lineage_dict[constellation] = parent_lineage
+            if lineage_name:
+                lineage_name_dict[lineage_name] = constellation
         else:
             logging.warning("Warning: %s is not a valid constellation file - ignoring" % constellation_file)
 
-    return constellation_dict, name_dict, rule_dict, mrca_lineage_dict, incompatible_dict
+    return constellation_dict, name_dict, rule_dict, mrca_lineage_dict, incompatible_dict, parent_lineage_dict, lineage_name_dict
 
 
 def parse_mutations_list(mutations_list, reference_seq, features_dict):
@@ -761,24 +777,22 @@ def get_number_switches(barcode_list, ref_char="-", ambig_char = "X"):
 
     return number_switches,len_non_ambig_barcode
 
-def prob_number_errors_or_fewer(counts):
-    # H0: missing is due to errors
-    # H1: missing is due to recombination
-    prob = counts["substitution"]["alt"]^prob_snp_error + prob_del_error * counts["indel"]["alt"]
+#def prob_number_errors_or_fewer(counts):
+#    # H0: missing is due to errors
+#    # H1: missing is due to recombination
+#    prob = counts["substitution"]["alt"]^prob_snp_error + prob_del_error * counts["indel"]["alt"]
 
-def prob_number_switches_or_fewer(number_switches, len_non_ambig_barcode):
-    # H0: sample is random draws from mixture
-    # H1: sample is a due to recombination
-
-
-
-def get_interspersion(top_scoring, counts, barcode_list, ref_char="-", ambig_char = "X"):
-    number_switches, len_non_ambig_barcode = get_number_switches(barcode_list, ref_char="-", ambig_char = "X"
+#def prob_number_switches_or_fewer(number_switches, len_non_ambig_barcode):
+#    # H0: sample is random draws from mixture
+#    # H1: sample is a due to recombination
+#    return
 
 
-    # H0: missing is due to sequencing errors
-    # H1: sample is a random mixture of
-    return
+#def get_interspersion(top_scoring, counts, barcode_list, ref_char="-", ambig_char = "X"):
+#    number_switches, len_non_ambig_barcode = get_number_switches(barcode_list, ref_char="-", ambig_char = "X"
+#    # H0: missing is due to sequencing errors
+#    # H1: sample is a random mixture of
+#    return
 
 
 def type_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json, ref_char=None,
@@ -786,7 +800,8 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
                         combination=False, interspersion=False):
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
-    constellation_dict, name_dict, rule_dict, mrca_lineage_dict, incompatible_dict = load_constellations(list_constellation_files,
+    constellation_dict, name_dict, rule_dict, mrca_lineage_dict, \
+    incompatible_dict, parent_lineage_dict, lineage_name_dict = load_constellations(list_constellation_files,
                                                                                               constellation_names,
                                                                                               reference_seq,
                                                                                               features_dict,
@@ -886,6 +901,27 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
         if counts_out[constellation]:
             counts_out[constellation].close()
 
+def combine_counts_call_notes(counts1, call1, note1, counts2, call2, note2):
+    counts = {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0, 'rules': 0,
+              'substitution': {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0},
+              'indel': {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0},
+              'support': 0, 'conflict': 0}
+    for key in counts:
+        if key in ["substitution", "indel"]:
+            for subkey in counts[key]:
+                counts[key][subkey] = counts1[key][subkey] + counts2[key][subkey]
+        else:
+            counts[key] = counts1[key] + counts2[key]
+    counts['support'] = round(counts['alt'] / float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']), 4)
+    counts['conflict'] = round(counts['ref'] / float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']), 4)
+    call = call1 and call2
+    note = note1
+    if note != "" and note2 != "":
+        note += ";" + note2
+    else:
+        note = note2
+    return counts, call, note
+
 
 def classify_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json,
                             output_counts=False, call_all=False, long=False, label=None, list_incompatible=False,
@@ -893,7 +929,8 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
 
     reference_seq, features_dict = load_feature_coordinates(reference_json)
 
-    constellation_dict, name_dict, rule_dict, mrca_lineage_dict, incompatible_dict = load_constellations(list_constellation_files,
+    constellation_dict, name_dict, rule_dict, mrca_lineage_dict, \
+    incompatible_dict, parent_lineage_dict, lineage_name_dict = load_constellations(list_constellation_files,
                                                                                               constellation_names,
                                                                                               reference_seq,
                                                                                               features_dict,
@@ -901,6 +938,9 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                                                                                               include_ancestral=True,
                                                                                               rules_required=True,
                                                                                               ignore_fails=True)
+
+    logging.debug("parent_dict: %s" %parent_lineage_dict)
+    logging.debug("lineage_name_dict: %s" %lineage_name_dict)
 
     if mutations_list:
         mutations_list, mutation_variants = parse_mutations_list(mutations_list, reference_seq, features_dict)
@@ -944,21 +984,41 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             best_conflict = 1
             best_counts = None
             scores = {}
+            children = {}
             for constellation in constellation_dict:
                 constellation_name = name_dict[constellation]
+                parents = []
                 if not constellation_name:
                     continue
                 counts, call, note = count_and_classify(record.seq,
                                                   constellation_dict[constellation],
                                                   rule_dict[constellation])
+                current_constellation = constellation
+                while current_constellation in parent_lineage_dict:
+                    logging.debug("Current constellation %s in parent dict" % current_constellation)
+                    current_constellation = name_dict[lineage_name_dict[parent_lineage_dict[current_constellation]]]
+                    parents.append(current_constellation)
+                    parent_counts, parent_call, parent_note = count_and_classify(record.seq,
+                                                            constellation_dict[current_constellation],
+                                                            rule_dict[current_constellation])
+                    counts, call, note = combine_counts_call_notes(counts, call, note, parent_counts, parent_call, parent_note)
+
+                for parent in parents:
+                    if parent not in children:
+                        children[parent] = []
+                    children[parent].append(constellation)
+
                 if call:
                     if call_all:
                         lineages.append(constellation_name)
                         names.append(constellation)
+                    elif constellation in children and best_constellation in children[constellation]:
+                        continue
                     elif (not best_constellation) \
                         or (counts['support'] > best_support) \
                         or (counts['support'] == best_support and counts['conflict'] < best_conflict)\
-                        or (counts['support'] == best_support and counts['conflict'] == best_conflict and counts['rules'] > best_counts["rules"]):
+                        or (counts['support'] == best_support and counts['conflict'] == best_conflict and counts['rules'] > best_counts["rules"])\
+                        or (best_constellation in parents):
                         best_constellation = constellation
                         best_support = counts['support']
                         best_conflict = counts['conflict']
@@ -1014,7 +1074,9 @@ def list_constellations(list_constellation_files, constellation_names, reference
 
     list_of_constellations = set()
     for constellation_file in list_constellation_files:
-        constellation, output_name, variants, ignore, mrca_lineage, incompatible_lineage_calls = parse_variants_in(reference_seq, features_dict, constellation_file, constellation_names, label=label)
+        constellation, output_name, variants, ignore, mrca_lineage, \
+        incompatible_lineage_calls, parent_lineage, lineage_name = \
+            parse_variants_in(reference_seq, features_dict, constellation_file, constellation_names, label=label)
         if not constellation:
             continue
         if constellation_names and constellation not in constellation_names and output_name not in constellation_names:
