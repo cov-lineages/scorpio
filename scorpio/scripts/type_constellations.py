@@ -8,6 +8,7 @@ import sys
 import json
 import re
 import logging
+import copy
 import math
 
 if sys.version_info[0] < 3:
@@ -868,7 +869,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
             out_list = [record.id]
             for constellation in constellation_dict:
-                barcode_list, counts, constellation_count_dict, sorted_alt_sites = generate_barcode(record.seq, constellation_dict[constellation], ref_char, constellation_count_dict=constellation_count_dict)
+                barcode_list, counts, sample_constellation_count_dict, sorted_alt_sites = generate_barcode(record.seq, constellation_dict[constellation], ref_char, constellation_count_dict=copy.deepcopy(constellation_count_dict))
                 if output_counts or append_genotypes:
                     columns = [record.id]
                     if output_counts:
@@ -878,15 +879,15 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
                         columns.extend(barcode_list)
                     if combination:
                         scores = {}
-                        for candidate in constellation_count_dict:
-                            if constellation_count_dict[candidate]["alt"] > 0:
+                        for candidate in sample_constellation_count_dict:
+                            if sample_constellation_count_dict[candidate]["alt"] > 0:
                                 summary = "%s:%i|%i|%i|%i" % (
-                                candidate, constellation_count_dict[candidate]["ref"],
-                                constellation_count_dict[candidate]["alt"],
-                                constellation_count_dict[candidate]["ambig"],
-                                constellation_count_dict[candidate]["oth"])
-                                score = float(constellation_count_dict[candidate]["alt"]) / \
-                                        constellation_count_dict[candidate]["total"]
+                                candidate, sample_constellation_count_dict[candidate]["ref"],
+                                sample_constellation_count_dict[candidate]["alt"],
+                                sample_constellation_count_dict[candidate]["ambig"],
+                                sample_constellation_count_dict[candidate]["oth"])
+                                score = float(sample_constellation_count_dict[candidate]["alt"]) / \
+                                        sample_constellation_count_dict[candidate]["total"]
                                 scores[score] = summary
                         sorted_scores = sorted(scores, key=lambda x: float(x), reverse=True)
                         columns.append("; ".join([scores[score] for score in sorted_scores]))
