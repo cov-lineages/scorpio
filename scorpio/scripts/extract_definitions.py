@@ -66,7 +66,7 @@ def get_group_dict(in_variants, group_column, index_column, subset):
                 if subset and row[group_column] not in subset:
                     continue
                 if row[index_column] in group_dict:
-                    logging.warning("%s is a duplicate in group CSV, keeping first")
+                    logging.warning("%s is a duplicate in group CSV, keeping first" % row[index_column])
                 else:
                     group_dict[row[index_column]] = row[group_column]
                     groups.add(row[group_column])
