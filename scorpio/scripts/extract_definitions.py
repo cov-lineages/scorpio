@@ -208,8 +208,8 @@ def define_mutations(list_variants, feature_dict, reference_seq, include_protein
                 current[3] = new[3]
         elif current[0] != "":
             var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein)
-            if freq:
-                merged_list.append("%s:%s" % (var, freq))
+            if current[3]:
+                merged_list.append("%s:%s" % (var, current[3]))
             else:
                 merged_list.append(var)
             current = new
@@ -217,8 +217,8 @@ def define_mutations(list_variants, feature_dict, reference_seq, include_protein
             current = new
     if current[0] != "":
         var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein)
-        if freq:
-            merged_list.append("%s:%s" % (var, freq))
+        if current[3]:
+            merged_list.append("%s:%s" % (var, current[3]))
         else:
             merged_list.append(var)
     return merged_list
