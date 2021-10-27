@@ -66,7 +66,7 @@ def get_group_dict(in_variants, group_column, index_column, subset):
                 if subset and row[group_column] not in subset:
                     continue
                 if row[index_column] in group_dict:
-                    logging.warning("%s is a duplicate in group CSV, keeping first")
+                    logging.warning("%s is a duplicate in group CSV, keeping first" % row[index_column])
                 else:
                     group_dict[row[index_column]] = row[group_column]
                     groups.add(row[group_column])
@@ -208,8 +208,8 @@ def define_mutations(list_variants, feature_dict, reference_seq, include_protein
                 current[3] = new[3]
         elif current[0] != "":
             var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein)
-            if freq:
-                merged_list.append("%s:%s" % (var, freq))
+            if current[3]:
+                merged_list.append("%s:%s" % (var, current[3]))
             else:
                 merged_list.append(var)
             current = new
@@ -217,8 +217,8 @@ def define_mutations(list_variants, feature_dict, reference_seq, include_protein
             current = new
     if current[0] != "":
         var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein)
-        if freq:
-            merged_list.append("%s:%s" % (var, freq))
+        if current[3]:
+            merged_list.append("%s:%s" % (var, current[3]))
         else:
             merged_list.append(var)
     return merged_list
@@ -237,7 +237,7 @@ def subtract_outgroup(common, outgroup_common):
 
 def write_constellation(prefix, group, list_variants, list_intermediates, list_ancestral):
     group_dict = {"name": group, "sites": list_variants, "intermediate": list_intermediates,
-                  "rules": {"min_alt": max(len(list_variants) - 3, min(len(list_variants), 3)), "max_ref": 3}}
+                  "rules": {"min_alt": max(len(list_variants) - 8, min(len(list_variants), 3)), "max_ref": 3}}
     if list_ancestral:
         group_dict["ancestral"] = list_ancestral
     with open('%s/%s.json' % (prefix, group), 'w') as outfile:

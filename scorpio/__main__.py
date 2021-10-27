@@ -251,7 +251,7 @@ def main(sysargs = sys.argv[1:]):
         if not args.reference_json:
             args.reference_json = reference_json
             logging.info("Found reference %s" %args.reference_json)
-        if not args.constellations and args.command in ['haplotype', 'classify']:
+        if not args.constellations and args.command in ['haplotype', 'classify', 'list']:
             args.constellations = list_constellation_files
             logging.info("Found constellations:")
             for c in args.constellations:
