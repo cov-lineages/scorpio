@@ -294,8 +294,8 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
 
     in_json.close()
     sorted_variants = sorted(variant_list, key=lambda x: int(x["ref_start"]))
-    for var in sorted_variants:
-        print(var)
+    #for var in sorted_variants:
+    #    print(var)
 
     return sorted_variants, name, output_name, rules, mrca_lineage, incompatible_lineage_calls, parent_lineage, lineage_name
 
@@ -1087,6 +1087,7 @@ def list_constellations(list_constellation_files, constellation_names, reference
             list_of_constellations.add(mrca_lineage)
         elif len(variants) > 0:
             list_of_constellations.add(output_name)
+    print("\n".join(list_of_constellations))
 
 def parse_args():
     parser = argparse.ArgumentParser(description="""Type an alignment at specific sites and classify with a barcode.""",
