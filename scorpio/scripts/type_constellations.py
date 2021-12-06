@@ -479,7 +479,7 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
     elif var["type"] == "aa":
         try:
             query = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] - 1 + 3 * len(var["ref_allele"])]
-            query_allele = query.translate()
+            query_allele = query.translate(gap = "-")
             #query_allele_minus = record_seq.upper()[var["ref_start"] - 2:var["ref_start"] + 1].translate()
             #query_allele_plus = record_seq.upper()[var["ref_start"]:var["ref_start"] + 3].translate()
             #print("Found", query_allele, query_allele_minus, query_allele_plus)
@@ -532,15 +532,15 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
         if query_allele == var["ref_allele"]:
             call = 'ref'
             query_allele = 0
+        elif query_allele == "-" * var["length"] or query_allele == "N" * var["length"]:
+            call = 'alt'
+            query_allele = max(int(var["length"] / 3), 1)
         elif "N" in query_allele:
             call = 'ambig'
             if not oth_char:
                 query_allele = "X"
             else:
                 query_allele = "N"
-        elif query_allele == "-" * var["length"]:
-            call = 'alt'
-            query_allele = int(var["length"] / 3)
         else:
             call = 'oth'
             if not oth_char:
