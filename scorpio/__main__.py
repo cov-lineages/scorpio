@@ -113,6 +113,10 @@ def main(sysargs = sys.argv[1:]):
         "--combination", dest="combination", action="store_true",
         help="Combines the mutations for the specified constellations, and outputs a string across them all, with counts per found constellation"
     )
+    subparser_haplotype.add_argument(
+        "--interspersion", dest="interspersion", action="store_true",
+        help="Evaluates an interspersion score"
+    )
     subparser_haplotype.set_defaults(func=scorpio.subcommands.haplotype.run)
 
     # _______________________________  report  __________________________________#

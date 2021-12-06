@@ -15,4 +15,5 @@ def run(options):
                         options.append_genotypes,
                         options.mutations,
                         options.dry_run,
-                        options.combination)
+                        options.combination,
+                        options.interspersion)
