@@ -133,8 +133,13 @@ def variant_to_variant_record(l, refseq, features_dict, ignore_fails=False):
     to a dict
     """
     #print("Parsing variant %s" %l)
-    lsplit = l.split(":")
     info = {}
+
+    if "#" in l:
+        l = l.split("#")[0].strip()
+        if l == "":
+            return info
+    lsplit = l.split(":")
 
     if "+" in l:
         m = re.match(r'[aa:]*(?P<cds>\w+):(?P<pos>\d+)\+(?P<alt_allele>[a-zA-Z]+)', l)
