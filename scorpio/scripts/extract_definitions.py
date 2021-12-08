@@ -119,7 +119,9 @@ def get_common_mutations(var_dict, min_occurance=3, threshold_common=0.98, thres
     return common, intermediate
 
 
-def translate_if_possible(nuc_start, nuc_ref, nuc_alt, feature_dict, reference_seq, include_protein=False):
+def translate_if_possible(nuc_start, nuc_ref, nuc_alt, feature_dict, reference_seq, include_protein=False, skip=False):
+    if skip:
+         return "nuc:%s%i%s" % (nuc_ref, nuc_start, nuc_alt)
     nuc_end = nuc_start + len(nuc_ref)
     nuc_start = int(nuc_start)
     nuc_end = int(nuc_end)
@@ -166,7 +168,7 @@ def translate_to_protein_if_possible(cds, aa_start, feature_dict):
                 return feature, aa_start-feature_dict[feature][0]+1
     return cds, aa_start
 
-def define_mutations(list_variants, feature_dict, reference_seq, include_protein=False):
+def define_mutations(list_variants, feature_dict, reference_seq, include_protein=False, skip_translate=False):
     merged_list = []
     if not list_variants:
         return merged_list
@@ -192,7 +194,10 @@ def define_mutations(list_variants, feature_dict, reference_seq, include_protein
             else:
                 merged_list.append(new_var)
         else:
-            intermediate_list.append([var[0], int(var[1:-1]), var[-1], freq])
+            try:
+                intermediate_list.append([var[0], int(var[1:-1]), var[-1], freq])
+            except:
+                print("could not add var %s to intermediate list" %var)
 
     intermediate_list.sort(key=itemgetter(1))
     current = ["", 1, "", None]
@@ -207,7 +212,7 @@ def define_mutations(list_variants, feature_dict, reference_seq, include_protein
             elif new[3]:
                 current[3] = new[3]
         elif current[0] != "":
-            var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein)
+            var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein, skip_translate)
             if current[3]:
                 merged_list.append("%s:%s" % (var, current[3]))
             else:
@@ -216,7 +221,7 @@ def define_mutations(list_variants, feature_dict, reference_seq, include_protein
         else:
             current = new
     if current[0] != "":
-        var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein)
+        var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein, skip_translate)
         if current[3]:
             merged_list.append("%s:%s" % (var, current[3]))
         else:
@@ -245,7 +250,7 @@ def write_constellation(prefix, group, list_variants, list_intermediates, list_a
 
 
 def extract_definitions(in_variants, in_groups, group_column, index_column, reference_json, prefix, subset,
-                        threshold_common, threshold_intermediate, outgroup_file, include_protein):
+                        threshold_common, threshold_intermediate, outgroup_file, include_protein, skip_translate):
     if not in_groups:
         in_groups = in_variants
 
@@ -305,9 +310,9 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
         if group in outgroup_var_dict:
             outgroup_common, outgroup_intermediate = get_common_mutations(outgroup_var_dict[group], min_occurance=1, threshold_common=threshold_common, threshold_intermediate=threshold_intermediate)
             common, ancestral = subtract_outgroup(common, outgroup_common)
-        nice_common = define_mutations(common, feature_dict, reference_seq, include_protein)
-        nice_intermediate = define_mutations(intermediate, feature_dict, reference_seq, include_protein)
-        nice_ancestral = define_mutations(ancestral, feature_dict, reference_seq, include_protein)
+        nice_common = define_mutations(common, feature_dict, reference_seq, include_protein, skip_translate)
+        nice_intermediate = define_mutations(intermediate, feature_dict, reference_seq, include_protein, skip_translate)
+        nice_ancestral = define_mutations(ancestral, feature_dict, reference_seq, include_protein, skip_translate)
         write_constellation(prefix, group, nice_common, nice_intermediate, nice_ancestral)
 
 

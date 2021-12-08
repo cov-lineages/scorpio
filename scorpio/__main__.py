@@ -166,6 +166,10 @@ def main(sysargs = sys.argv[1:]):
         "--protein", dest="protein", action="store_true",
         help="Translates definition coordinates to proteins where possible"
     )
+    subparser_define.add_argument(
+        "--nucleotide", dest="nucleotide", action="store_true",
+        help="Do not translate to amino acid coordinates"
+    )
 
     subparser_define.set_defaults(func=scorpio.subcommands.define.run)
 
