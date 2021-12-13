@@ -147,9 +147,9 @@ def test_parse_json_in():
     assert len([v for v in variant_list if v["type"] == "del"]) == 3
     assert len([v for v in variant_list if v["type"] == "aa"]) == 15
     assert name == "Lineage_X"
-    assert rules["min_alt"] == 4
-    assert rules["max_ref"] == 6
-    assert rules["s:E484K"] == "alt"
+    assert rules["default"]["min_alt"] == 4
+    assert rules["default"]["max_ref"] == 6
+    assert rules["default"]["s:E484K"] == "alt"
     assert mrca_lineage == "B.1.1.7"
     assert incompatible_lineages == "A|B.1.351"
 
@@ -162,7 +162,7 @@ def test_parse_csv_in():
     assert len([v for v in variant_list if v["type"] == "del"]) == 3
     assert len([v for v in variant_list if v["type"] == "aa"]) == 15
     assert name == "lineage_X"
-    assert rules["s:E484K"] == "alt"
+    assert rules["default"]["s:E484K"] == "alt"
 
 
 def test_parse_textfile_in():
@@ -178,8 +178,8 @@ def test_parse_textfile_in():
 def test_parse_variants_in():
     in_files = ["%s/lineage_X.json" % data_dir, "%s/lineage_X.csv" % data_dir, "%s/lineage_X.txt" % data_dir]
     expect_names = ["Lineage_X", "lineage_X", "lineage_X"]
-    rule_dict_json = {"min_alt": 4, "max_ref": 6, "s:E484K": "alt"}
-    rule_dict_csv = {"s:E484K": "alt"}
+    rule_dict_json = {"default": {"min_alt": 4, "max_ref": 6, "s:E484K": "alt"}}
+    rule_dict_csv = {"default": {"s:E484K": "alt"}}
     rule_dict_txt = None
     expect_rules = [rule_dict_json, rule_dict_csv, rule_dict_txt]
 
@@ -248,8 +248,8 @@ def test_count_and_classify():
     oth_string = "gaaattcgcccgta-gctcgcaatag"
     seqs = [Seq(ref_string), Seq(alt_string), Seq(alt_plus_string), Seq(oth_string)]
 
-    rules = {"min_alt": 1, "max_ref": 1, "snp2": "alt"}
-    expect_classify = [False, False, True, False]
+    rules = {"default": {"min_alt": 1, "max_ref": 1, "snp2": "alt"}}
+    expect_classify = [False, False, "default", False]
     expect_counts = [{"ref": 5, "alt": 0, "ambig": 0, "oth": 1, "rules": 0, 'substitution': {'ref': 4, 'alt': 0, 'ambig': 0, 'oth': 0}, 'indel': {'ref': 1, 'alt': 0, 'ambig': 0, 'oth': 1}, "support": 0.0, "conflict": 0.8333},
                      {"ref": 1, "alt": 4, "ambig": 0, "oth": 1, "rules": 0, 'substitution': {'ref': 1, 'alt': 3, 'ambig': 0, 'oth': 0}, 'indel': {'ref': 0, 'alt': 1, 'ambig': 0, 'oth': 1}, "support": 0.6667, "conflict": 0.1667},
                      {"ref": 0, "alt": 5, "ambig": 0, "oth": 1, "rules": 3, 'substitution': {'ref': 0, 'alt': 4, 'ambig': 0, 'oth': 0}, 'indel': {'ref': 0, 'alt': 1, 'ambig': 0, 'oth': 1}, "support": 0.8333, "conflict": 0.0},

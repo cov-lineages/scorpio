@@ -295,7 +295,7 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
                 variant_list.append(record)
 
     if "rules" in json_dict:
-        if type(json_dict["rules"]) == dict:
+        if type(json_dict["rules"]) == dict and "default" in json_dict["rules"]:
             rules = json_dict["rules"]
         else:
             rules = {"default": json_dict["rules"]}
@@ -573,11 +573,11 @@ def var_follows_rules(call, rule):
     else:
         return call == rule_call
 
-def counts_follow_rules(counts, rules):
+def counts_follow_rules(counts, rules, key):
     # rules allowed include "max_ref", "min_alt", "min_snp_alt"
     is_rule_follower = True
     notes = []
-    for rule in rules:
+    for rule in rules[key]:
         if ":" in rule:
             continue
         elif str(rule).startswith("min") or str(rule).startswith("max"):
@@ -585,12 +585,12 @@ def counts_follow_rules(counts, rules):
             if len(rule_parts) <= 1:
                 continue
             elif len(rule_parts) == 2:
-                if rule_parts[0] == "min" and counts[rule_parts[1]] < rules[rule]:
+                if rule_parts[0] == "min" and counts[rule_parts[1]] < rules[key][rule]:
                     is_rule_follower = False
-                elif rule_parts[0] == "max" and counts[rule_parts[1]] > rules[rule]:
+                elif rule_parts[0] == "max" and counts[rule_parts[1]] > rules[key][rule]:
                     is_rule_follower = False
                 else:
-                    counts["rules"] += 1
+                    counts["rules"][key] += 1
             elif len(rule_parts) == 3:
                 part = None
                 if rule_parts[1] in ["substitution", "snp"]:
@@ -599,16 +599,16 @@ def counts_follow_rules(counts, rules):
                     part = "indel"
                 if not part:
                     is_rule_follower = False
-                elif rule_parts[0] == "min" and counts[part][rule_parts[2]] < rules[rule]:
+                elif rule_parts[0] == "min" and counts[part][rule_parts[2]] < rules[key][rule]:
                     is_rule_follower = False
-                    notes.append("%s_%s_count=%i is less than %i" % (part, rule_parts[2], counts[part][rule_parts[2]], rules[rule]))
-                elif rule_parts[0] == "max" and counts[part][rule_parts[2]] > rules[rule]:
+                    notes.append("%s_%s_count=%i is less than %i" % (part, rule_parts[2], counts[part][rule_parts[2]], rules[key][rule]))
+                elif rule_parts[0] == "max" and counts[part][rule_parts[2]] > rules[key][rule]:
                     is_rule_follower = False
-                    notes.append("%s_%s_count=%i is more than %i" % (part, rule_parts[2], counts[part][rule_parts[2]], rules[rule]))
+                    notes.append("%s_%s_count=%i is more than %i" % (part, rule_parts[2], counts[part][rule_parts[2]], rules[key][rule]))
                 else:
-                    counts["rules"] += 1
+                    counts["rules"][key] += 1
         else:
-            logging.warning("Warning: Ignoring rule %s:%s" % (rule, str(rules[rule])))
+            logging.warning("Warning: Ignoring rule %s:%s" % (rule, str(rules[key][rule])))
     return is_rule_follower, ";".join(notes)
 
 def count_and_classify(record_seq, variant_list, rules):
@@ -643,11 +643,13 @@ def count_and_classify(record_seq, variant_list, rules):
         if not is_rule_follower_dict[key]:
             continue
         else:
-            call, note = counts_follow_rules(counts, rules[key])
+            call, note = counts_follow_rules(counts, rules, key)
             if call:
                 counts["rules"] = counts["rules"][key]
                 call = key
                 return counts, call, note
+    counts["rules"] = counts["rules"]["default"]
+    return counts, False, ""
 
 
 def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_char="X",constellation_count_dict=None):
