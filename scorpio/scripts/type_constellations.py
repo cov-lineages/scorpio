@@ -295,7 +295,10 @@ def parse_json_in(refseq, features_dict, variants_file, constellation_names=None
                 variant_list.append(record)
 
     if "rules" in json_dict:
-        rules = json_dict["rules"]
+        if type(json_dict["rules"]) == dict:
+            rules = json_dict["rules"]
+        else:
+            rules = {"default": json_dict["rules"]}
 
     in_json.close()
     sorted_variants = sorted(variant_list, key=lambda x: int(x["ref_start"]))
@@ -346,9 +349,9 @@ def parse_csv_in(refseq, features_dict, variants_file, constellation_names=None,
     csv_in.close()
     rules = None
     if len(compulsory) > 0:
-        rules = {}
+        rules = {"default": {}}
         for var in compulsory:
-            rules[var] = "alt"
+            rules["default"][var] = "alt"
     sorted_variants = sorted(variant_list, key=lambda x: int(x["ref_start"]))
     return sorted_variants, name, rules
 
@@ -610,10 +613,13 @@ def counts_follow_rules(counts, rules):
 
 def count_and_classify(record_seq, variant_list, rules):
     assert rules is not None
-    counts = {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0, 'rules': 0,
+    counts = {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0, 'rules': {},
               'substitution': {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0},
               'indel': {'ref': 0, 'alt': 0, 'ambig': 0, 'oth': 0}}
-    is_rule_follower = True
+    is_rule_follower_dict = {}
+    for key in rules:
+        is_rule_follower_dict[key] = True
+        counts["rules"][key] = 0
 
     for var in variant_list:
         call, query_allele = call_variant_from_fasta(record_seq, var)
@@ -623,20 +629,25 @@ def count_and_classify(record_seq, variant_list, rules):
             counts["substitution"][call] += 1
         elif var['type'] in ["ins", "del"]:
             counts["indel"][call] += 1
-        if var["name"] in rules:
-            if var_follows_rules(call, rules[var["name"]]):
-                counts['rules'] += 1
-            elif is_rule_follower:
-                is_rule_follower = False
+        for key in rules:
+            if var["name"] in rules[key]:
+                if var_follows_rules(call, rules[key][var["name"]]):
+                    counts['rules'][key] += 1
+                elif is_rule_follower_dict[key]:
+                    is_rule_follower_dict[key] = False
 
     counts['support'] = round(counts['alt']/float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']),4)
     counts['conflict'] = round(counts['ref'] /float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']),4)
 
-    if not is_rule_follower:
-        return counts, False, ""
-    else:
-        call, note = counts_follow_rules(counts, rules)
-        return counts, call, note
+    for key in rules:
+        if not is_rule_follower_dict[key]:
+            continue
+        else:
+            call, note = counts_follow_rules(counts, rules[key])
+            if call:
+                counts["rules"] = counts["rules"][key]
+                call = key
+                return counts, call, note
 
 
 def generate_barcode(record_seq, variant_list, ref_char=None, ins_char="?", oth_char="X",constellation_count_dict=None):
@@ -920,7 +931,15 @@ def combine_counts_call_notes(counts1, call1, note1, counts2, call2, note2):
             counts[key] = counts1[key] + counts2[key]
     counts['support'] = round(counts['alt'] / float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']), 4)
     counts['conflict'] = round(counts['ref'] / float(counts['alt'] + counts['ref'] + counts['ambig'] + counts['oth']), 4)
-    call = call1 and call2
+    if not call1 or not call2:
+        call = False
+    elif call1 == call2:
+        call = call1
+    elif call1 == "default":
+        call = call2
+    else:
+        call = call1
+
     note = note1
     if note != "" and note2 != "":
         note += ";" + note2
@@ -989,6 +1008,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             best_support = 0
             best_conflict = 1
             best_counts = None
+            best_call = False
             scores = {}
             children = {}
             for constellation in constellation_dict:
@@ -1016,6 +1036,8 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
 
                 if call:
                     if call_all:
+                        if call != "default":
+                            constellation_name = "%s %s" %(call, constellation_name)
                         lineages.append(constellation_name)
                         names.append(constellation)
                     elif constellation in children and best_constellation in children[constellation]:
@@ -1029,6 +1051,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                         best_support = counts['support']
                         best_conflict = counts['conflict']
                         best_counts = counts
+                        best_call = call
 
                 if interspersion:
                     if counts["alt"] > 1:
@@ -1042,7 +1065,11 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                                                        counts['oth'], counts['rules'], counts['support'],
                                                           counts['conflict'], call, constellation, note))
             if not call_all and best_constellation:
-                lineages.append(name_dict[best_constellation])
+                if best_call != "default":
+                    best_constellation_name = "%s %s" % (best_call, name_dict[best_constellation])
+                else:
+                    best_constellation_name = name_dict[best_constellation]
+                lineages.append(best_constellation_name)
                 names.append(best_constellation)
 
             out_entries = [record.id, "|".join(lineages), "|".join([mrca_lineage_dict[n] for n in names])]
