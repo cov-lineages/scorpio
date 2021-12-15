@@ -1015,6 +1015,7 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
             children = {}
             for constellation in constellation_dict:
                 constellation_name = name_dict[constellation]
+                logging.debug("Consider constellation %s" %constellation_name)
                 parents = []
                 if not constellation_name:
                     continue
@@ -1037,19 +1038,21 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                     children[parent].append(constellation)
 
                 if call:
+                    logging.debug("Have call for %s" %constellation_name)
                     if call_all:
                         if call != "default":
                             constellation_name = "%s %s" %(call, constellation_name)
                         lineages.append(constellation_name)
                         names.append(constellation)
                     elif constellation in children and best_constellation in children[constellation]:
-                        continue
+                        logging.debug("Ignore as parent of best constellation")
                     elif (not best_constellation) \
                         or (counts['support'] > best_support) \
                         or (counts['support'] == best_support and counts['conflict'] < best_conflict)\
                         or (counts['support'] == best_support and counts['conflict'] == best_conflict and counts['rules'] > best_counts["rules"])\
                         or (best_constellation in parents):
                         best_constellation = constellation
+                        logging.debug("Set best constellation %s" %best_constellation)
                         best_support = counts['support']
                         best_conflict = counts['conflict']
                         best_counts = counts
