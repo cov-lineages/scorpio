@@ -29,7 +29,7 @@ def main(sysargs = sys.argv[1:]):
     common = argparse.ArgumentParser(prog=_program, add_help=False)
 
     io_group = common.add_argument_group('Input/output options')
-    io_group.add_argument("-i", "--input", dest="input", required=False, help="Primary input file")
+    io_group.add_argument("-i", "--input", dest="input", required=True, help="Primary input file - an aligned FASTA for classify/haplotype or a CSV for define")
     io_group.add_argument("-m", "--metadata", dest="metadata", required=False, help="CSV of associated metadata")
     io_group.add_argument("-o", "--output", dest="output", required=False, help="Output file or path")
     io_group.add_argument("-p", "--prefix", dest="prefix", required=False, help="Output prefix. Default: scorpio")
