@@ -15,4 +15,6 @@ def run(options):
                             options.label,
                             options.list_incompatible,
                             options.mutations,
-                            options.dry_run)
+                            options.dry_run,
+                            False,
+                            options.threads)
