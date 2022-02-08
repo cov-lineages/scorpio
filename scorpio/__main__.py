@@ -29,8 +29,6 @@ def main(sysargs = sys.argv[1:]):
     common = argparse.ArgumentParser(prog=_program, add_help=False)
 
     io_group = common.add_argument_group('Input/output options')
-    io_group.add_argument("-i", "--input", dest="input", required=True, help="Primary input file - an aligned FASTA for classify/haplotype or a CSV for define")
-    io_group.add_argument("-m", "--metadata", dest="metadata", required=False, help="CSV of associated metadata")
     io_group.add_argument("-o", "--output", dest="output", required=False, help="Output file or path")
     io_group.add_argument("-p", "--prefix", dest="prefix", required=False, help="Output prefix. Default: scorpio")
     io_group.add_argument("--log-file", dest="log_file", metavar='<filename>', required=False,
@@ -61,6 +59,7 @@ def main(sysargs = sys.argv[1:]):
         parents=[common],
         help="Takes a set of lineage-defining constellations with rules and classifies sequences by them"
     )
+    subparser_classify.add_argument("-i", "--input", dest="input", required=True, help="Primary input file - an aligned FASTA")
     subparser_classify.add_argument(
         '--reference-json', dest="reference_json", help='JSON file containing keys "genome" with reference sequence '
                                  'and "proteins", "features" or "genes" with features of interest'
@@ -92,6 +91,7 @@ def main(sysargs = sys.argv[1:]):
         parents=[common],
         help="Takes a set of constellations and writes haplotypes (either as strings or individual columns)",
     )
+    subparser_haplotype.add_argument("-i", "--input", dest="input", required=True, help="Primary input file - an aligned FASTA")
     subparser_haplotype.add_argument(
         '--reference-json', dest="reference_json", help='JSON file containing keys "genome" with reference sequence '
                                  'and "proteins", "features" or "genes" with features of interest'
@@ -128,6 +128,8 @@ def main(sysargs = sys.argv[1:]):
              "metadata (takes the one in the first file)",
     )
 
+    subparser_report.add_argument("-i", "--input", dest="input", required=True, help="Primary input file - an aligned FASTA")
+
     subparser_report.set_defaults(func=scorpio.subcommands.report.run)
 
     # _______________________________  define  __________________________________#
@@ -138,6 +140,7 @@ def main(sysargs = sys.argv[1:]):
         help="Takes a CSV column of per sample mutations, and a column defining groups and extracts group-defining "
              "mutations",
     )
+    subparser_define.add_argument("-i", "--input", dest="input", required=True, help="Primary input file - a CSV")
     subparser_define.add_argument(
         '--reference-json', dest="reference_json", help='JSON file containing keys "genome" with reference sequence '
                                                         'and "proteins", "features" or "genes" with features of interest'
