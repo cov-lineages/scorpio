@@ -826,10 +826,9 @@ def file_writer(out_csv, list_of_constellations, q):
         handle_dict[list_of_constellations[0]] = open(out_csv, "w")
     else:
         handle_dict["summary"] = open(out_csv, "w")
-
-    for constellation_name in list_of_constellations:
-        clean_name = re.sub("[^a-zA-Z0-9_\-.]", "_", constellation_name)
-        handle_dict[constellation_name] = open("%s.%s.csv" % (out_csv.replace(".csv", ""), clean_name), "w")
+        for constellation_name in list_of_constellations:
+            clean_name = re.sub("[^a-zA-Z0-9_\-.]", "_", constellation_name)
+            handle_dict[constellation_name] = open("%s.%s.csv" % (out_csv.replace(".csv", ""), clean_name), "w")
 
     while 1:
         handle, message = q.get()
@@ -886,7 +885,8 @@ def type_record(record, reference_seq, constellation_dict, name_dict, constellat
         out_list.append(''.join(barcode_list))
 
     res = "%s\n" % ",".join(out_list)
-    q.put(("summary", res))
+    if len(constellation_dict) > 1 or not (output_counts or append_genotypes):
+        q.put(("summary", res))
     return res
 
 def type_constellations(in_fasta, list_constellation_files, constellation_names, out_csv, reference_json, ref_char=None,
@@ -974,7 +974,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
         job.get()
 
     # now we are done, kill the listener
-    if len(list_constellation_names) != 1:
+    if len(list_constellation_names) > 1 or not (append_genotypes or output_counts):
         q.put(("summary", 'kill'))
 
     for constellation_name in list_constellation_names:
