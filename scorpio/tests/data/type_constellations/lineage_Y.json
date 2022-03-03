@@ -1,0 +1,47 @@
+{
+	"name": "Lineage_X",
+	"type": "variant",
+	"variant": {
+		"mrca_lineage": "B.1.1.7",
+		"incompatible_lineage_calls": ["A", "B.1.351"]
+	},
+	"sites": [
+		"nuc:C912T",
+		"nuc:T2680C",
+		"1ab:T1001I",
+		"1ab:A1708D",
+		"nuc:C5986T",
+		"1ab:I2230T",
+		"1ab:SGF3675-",
+		"snp:C14676T",
+		"nuc:C15279T",
+		"nuc:C16175T",
+		"s:HV69-",
+		"s:Y144-",
+		"s:E484K",
+		"s:N501Y",
+		"s:A570D # spike ",
+		"s:P681H",
+		"s:T716I",
+		"s:S982A",
+		"s:D1118H",
+		"8:Q27*",
+		"8:R52I",
+		"8:Y73C",
+		"N:D3L",
+		"N:S235F",
+                "#s:T777I"
+	],
+	"rules": {
+            "default": {
+		"min_alt": 10,
+		"max_ref": 3,
+		"s:E484K": "alt"
+            },
+            "probable" : {
+                "min_alt": 4,
+                "max_ref": 6,
+                "s:E484K": "not ref"
+            }
+	}
+}

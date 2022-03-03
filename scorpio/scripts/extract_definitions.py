@@ -61,9 +61,16 @@ def get_group_dict(in_variants, group_column, index_column, subset):
 
     with open(in_variants,"r") as f:
         reader = csv.DictReader(f)
+        if group_column not in reader.fieldnames:
+            logging.warning("Group column %s not found in input file %s" %(group_column, in_variants))
+            sys.exit(-1)
+        if index_column not in reader.fieldnames:
+            logging.warning("Index column %s not found in input file %s" %(index_column, in_variants))
+            sys.exit(-1)
         for row in reader:
             if group_column in row and index_column in row:
                 if subset and row[group_column] not in subset:
+                    logging.info("skip")
                     continue
                 if row[index_column] in group_dict:
                     logging.warning("%s is a duplicate in group CSV, keeping first" % row[index_column])
@@ -71,6 +78,9 @@ def get_group_dict(in_variants, group_column, index_column, subset):
                     group_dict[row[index_column]] = row[group_column]
                     groups.add(row[group_column])
 
+    if len(groups) == 0:
+        logging.warning("Found no groups to define")
+        sys.exit(-1)
     logging.info("Found %d groups" % len(groups))
 
     return group_dict
@@ -253,8 +263,10 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
                         threshold_common, threshold_intermediate, outgroup_file, include_protein, skip_translate):
     if not in_groups:
         in_groups = in_variants
+        logging.debug("Using input file %s for groups" % in_variants)
 
     outgroup_dict, outgroups = parse_outgroups(outgroup_file)
+    logging.debug("Parsed outgroups %s" % outgroups)
 
     groups_to_get = None
     if subset:
@@ -270,6 +282,7 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
     var_dict = {}
     outgroup_var_dict = {}
 
+    logging.debug("Process file %s" % in_variants)
     with open(in_variants, 'r', newline = '') as csv_in:
         reader = csv.DictReader(csv_in, delimiter=",", quotechar='\"', dialect = "unix")
         if index_column not in reader.fieldnames:
@@ -310,9 +323,11 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
         if group in outgroup_var_dict:
             outgroup_common, outgroup_intermediate = get_common_mutations(outgroup_var_dict[group], min_occurance=1, threshold_common=threshold_common, threshold_intermediate=threshold_intermediate)
             common, ancestral = subtract_outgroup(common, outgroup_common)
+        logging.debug("Niceify results")
         nice_common = define_mutations(common, feature_dict, reference_seq, include_protein, skip_translate)
         nice_intermediate = define_mutations(intermediate, feature_dict, reference_seq, include_protein, skip_translate)
         nice_ancestral = define_mutations(ancestral, feature_dict, reference_seq, include_protein, skip_translate)
+        logging.debug("Write constellations out to prefix %s" % prefix)
         write_constellation(prefix, group, nice_common, nice_intermediate, nice_ancestral)
 
 
