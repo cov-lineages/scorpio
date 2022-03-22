@@ -153,9 +153,8 @@ def test_haplotype_multi_output_counts():
                         default["interspersion"],
                         default["threads"])
 
-    for f in glob.glob("%s/haplotype/expected.%s*counts.csv" % (data_dir, run_name)):
-        expected = f
-        outfile = f.replace("expected.", "")
+    for expected in glob.glob("%s/haplotype/expected.%s*.csv" % (data_dir, run_name)):
+        outfile = expected.replace("expected.", "")
         assert filecmp.cmp(outfile, expected, shallow=False)
         os.unlink(outfile)
     expected = "%s/haplotype/expected.names_haplotype.csv" % data_dir
