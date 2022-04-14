@@ -1051,12 +1051,13 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                         or (counts['support'] == best_support and counts['conflict'] < best_conflict)\
                         or (counts['support'] == best_support and counts['conflict'] == best_conflict and counts['rules'] > best_counts["rules"])\
                         or (best_constellation in parents):
-                        best_constellation = constellation
-                        logging.debug("Set best constellation %s" %best_constellation)
-                        best_support = counts['support']
-                        best_conflict = counts['conflict']
-                        best_counts = counts
-                        best_call = call
+                        if mrca_lineage_dict[constellation]:
+                            best_constellation = constellation
+                            logging.debug("Set best constellation %s" %best_constellation)
+                            best_support = counts['support']
+                            best_conflict = counts['conflict']
+                            best_counts = counts
+                            best_call = call
 
                 if interspersion:
                     if counts["alt"] > 1:
