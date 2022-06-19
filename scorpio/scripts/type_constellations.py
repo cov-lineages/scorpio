@@ -738,10 +738,12 @@ def load_constellations(list_constellation_files, constellation_names, reference
     # constellation has a parent definition, but the parent is not included in the list
     if constellation_names:
         for constellation_name in constellation_names:
+            print("loading", constellation_name)
             current_constellation = constellation_name
             updated = False
             while current_constellation in parent_lineage_dict and current_constellation in constellation_names:
                 parent = name_dict[lineage_name_dict[parent_lineage_dict[constellation_name]]]
+                print("add parent for", constellation_name, parent)
                 if parent not in constellation_names:
                     logging.info("\n")
                     logging.info("Add variants for parent %s to constellation %s" % (parent, constellation_name))
@@ -814,12 +816,14 @@ def combine_constellations_by_name(constellation_dict, name_dict):
     return new_constellation_dict
 
 def add_parent_variants(constellation_variants, parent_variants):
+    print("add parent variants")
     for variant in parent_variants:
         if variant not in constellation_variants:
               constellation_variants.append(variant)
     return constellation_variants
 
 def add_parent_rules(constellation_rules, parent_rules):
+    print("add parent rules")
     for key in parent_rules:
         if key in constellation_rules:
             for rule in parent_rules[key]:
@@ -827,6 +831,8 @@ def add_parent_rules(constellation_rules, parent_rules):
                     constellation_rules[key][rule] += parent_rules[key][rule]
                 else:
                     constellation_rules[key][rule] = parent_rules[key][rule]
+        else:
+            print(key,parent_rules[key])
     return constellation_rules
 
 
@@ -1143,7 +1149,7 @@ def call_record(record, reference_seq, constellation_names, constellation_dict, 
                                                 rule_dict[constellation])
         current_constellation = constellation
         while current_constellation in parent_lineage_dict:
-            logging.debug("Current constellation %s in parent dict" % current_constellation)
+            logging.debug("Current         %s in parent dict" % current_constellation)
             current_constellation = lineage_name_dict[parent_lineage_dict[current_constellation]]
             parents.append(current_constellation)
             parent_counts, parent_call, parent_note = count_and_classify(record.seq,
