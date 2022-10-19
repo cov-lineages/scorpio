@@ -176,7 +176,7 @@ def test_classify_multi_output_counts():
                             default["interspersion"],
                             default["threads"])
 
-    for expected in glob.glob("%s/classify/expected.%s*.csv" % (data_dir, run_name)):
+    for expected in glob.glob("%s/classify/expected.%s.*.csv" % (data_dir, run_name)):
         outfile = expected.replace("expected.", "")
         assert filecmp.cmp(outfile, expected, shallow=False)
         os.unlink(outfile)
