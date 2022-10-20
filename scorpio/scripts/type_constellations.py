@@ -790,9 +790,10 @@ def type_record(record, reference, constellation_names, constellation_dict, cons
         sys.exit(1)
 
     out_list = [record.id]
-    #print(constellation_names)
-    #print(constellation_dict.keys())
+
     write_extended_files = output_counts or append_genotypes
+    single_file = len(constellation_names) == 1
+
 
     for constellation in constellation_dict.values():
         if constellation.output_name not in constellation_names:
@@ -804,6 +805,8 @@ def type_record(record, reference, constellation_names, constellation_dict, cons
                                                                                                    constellation_count_dict=copy.deepcopy(constellation_count_dict))
         if write_extended_files:
             columns = [record.id]
+            if single_file:
+                columns.append(''.join(barcode_list))
             if output_counts:
                 columns.append("%i,%i,%i,%i,%f,%f" % (counts['ref'], counts['alt'],
                                                       counts['ambig'], counts['oth'], counts['support'],
@@ -825,12 +828,14 @@ def type_record(record, reference, constellation_names, constellation_dict, cons
                 sorted_scores = sorted(scores, key=lambda x: float(x), reverse=True)
                 columns.append("; ".join([scores[score] for score in sorted_scores]))
             res = "%s\n" % ','.join(columns)
-            q.put((constellation.name, res))
+            print("write individual result to individual file", res)
+            q.put((constellation.output_name, res))
 
         out_list.append(''.join(barcode_list))
 
     res = "%s\n" % ",".join(out_list)
-    if len(constellation_dict) > 1 or not write_extended_files:
+    if len(constellation_names) > 1 or not write_extended_files:
+        print("write extended result to summary", res)
         q.put(("summary", res))
     return res
 
@@ -886,14 +891,15 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
     pool = mp.Pool(threads)
 
     write_extended_files = append_genotypes or output_counts
-    single_file_named_summary = False
     print("write_extended_files", write_extended_files)
-    print(constellation_names)
+
+    single_file_named_summary = False
     if len(constellation_names) > 1 or not write_extended_files:
+        single_file_named_summary = True
         header = "query,%s\n" % ",".join(constellation_names)
         q.put(("summary", header))
-        single_file_named_summary = True
-        print("single_file_named_summary", single_file_named_summary)
+
+    print("single_file_named_summary", single_file_named_summary)
 
     # put listener to work first
     list_constellation_names = constellation_names
@@ -907,6 +913,8 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
             if constellation.output_name not in constellation_names:
                 continue
             columns = ["query"]
+            if not single_file_named_summary:
+                columns.append("barcode")
             if output_counts:
                 columns.append("ref_count,alt_count,ambig_count,other_count,support,conflict")
             if append_genotypes:
@@ -915,7 +923,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
                 columns.append("notes")
             header = "%s\n" % ','.join(columns)
             if len(constellation_dict) > 1:
-                q.put((constellation.name, header))
+                q.put((constellation.output_name, header))
             else:
                 q.put(("summary", header))
 
@@ -933,11 +941,12 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
         job.get()
 
     # now we are done, kill the listener
-    if len(constellation_dict) > 1 or not write_extended_files:
+    if len(list_constellation_names) > 1 or single_file_named_summary:
         q.put(("summary", 'kill'))
 
-    for constellation_name in list_constellation_names:
-        q.put((constellation_name, "kill"))
+    if not single_file_named_summary:
+        for constellation_name in list_constellation_names:
+            q.put((constellation_name, "kill"))
 
     if threads == 1:
         pool.apply_async(file_writer, (out_csv, list_constellation_names, single_file_named_summary, q))
@@ -990,8 +999,8 @@ def get_columns(list_incompatible, long, call_all, mutations_list, single_file):
     return columns
 
 
-def call_record(record, reference, constellation_names, constellation_dict, lineage_name_dict,
-                output_counts, call_all, long, list_incompatible, mutations_list, mutation_variants, interspersion, q):
+def classify_record(record, reference, constellation_names, constellation_dict, lineage_name_dict,
+                    output_counts, call_all, long, list_incompatible, mutations_list, mutation_variants, interspersion, q):
     if len(record.seq) != len(reference.refseq):
         sys.stderr.write("The fasta record for %s isn't as long as the reference, is this fasta file aligned?\n"
                          % record.id)
@@ -1084,8 +1093,8 @@ def call_record(record, reference, constellation_names, constellation_dict, line
                     record.id, counts['ref'], counts['alt'], counts['ambig'],
                     counts['oth'], counts['rules'], counts['support'],
                     counts['conflict'], call, constellation.output_name, note)
-            if not single_file:
-                q.put((constellation.output_name, res))
+            q.put((constellation.output_name, res))
+            print("wrote full results to named file", res)
 
     if not call_all and best_constellation:
         if best_call != "default":
@@ -1117,10 +1126,9 @@ def call_record(record, reference, constellation_names, constellation_dict, line
 
     res = "%s\n" % ",".join(out_entries)
     print(res)
-    if single_file:
-        q.put((list_constellation_names[0], res))
-    else:
+    if not single_file:
         q.put(("summary", res))
+        print("wrote abbreviated results to summary file", res)
 
     return res
 
@@ -1163,8 +1171,8 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
     single_file = len(list_constellation_names) == 1 and output_counts
     if single_file:
         long = True
-    #if not output_counts:
-    #    list_constellation_names = []
+    if not output_counts:
+        list_constellation_names = []
 
     if threads > 1:
         pool.apply_async(file_writer, (out_csv, list_constellation_names, single_file, q))
@@ -1188,10 +1196,10 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
     jobs = []
     with open(in_fasta, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
-            job = pool.apply_async(call_record, (record, reference, constellation_names, constellation_dict,
-                                                 lineage_name_dict, output_counts, call_all,
-                                                 long, list_incompatible, mutations_list, mutation_variants,
-                                                 interspersion, q))
+            job = pool.apply_async(classify_record, (record, reference, constellation_names, constellation_dict,
+                                                     lineage_name_dict, output_counts, call_all,
+                                                     long, list_incompatible, mutations_list, mutation_variants,
+                                                     interspersion, q))
             jobs.append(job)
 
     # collect results from the workers through the pool result queue
