@@ -420,6 +420,31 @@ def test_classify_single_mutations_output_counts():
         assert filecmp.cmp(outfile, expected, shallow=False)
         os.unlink(outfile)
 
+def test_classify_multi_list_incompatible_long():
+    run_name = "multi_list_incompatible_long"
+    out_csv = "%s/classify/%s.csv" %(data_dir, run_name)
+    names = ['B.1.617.1-like', 'Delta (B.1.617.2-like) +K417N', 'Delta (AY.4-like)', 'Omicron (BA.1-like)', 'Zeta (P.2-like)']
+
+    classify_constellations(input,
+                            list_constellation_files,
+                            names,
+                            out_csv,
+                            reference_json,
+                            default["output_counts"],
+                            default["call_all"],
+                            True,
+                            default["label"],
+                            True,
+                            default["mutations"],
+                            default["dry_run"],
+                            default["interspersion"],
+                            default["threads"])
+
+    for expected in glob.glob("%s/classify/expected.%s*.csv" % (data_dir, run_name)):
+        outfile = expected.replace("expected.", "")
+        assert filecmp.cmp(outfile, expected, shallow=False)
+        os.unlink(outfile)
+
 def main():
     test_classify_basic()
 

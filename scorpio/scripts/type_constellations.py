@@ -308,7 +308,6 @@ class Constellation:
 
         logging.debug("")
         logging.debug("Parsing constellation JSON file %s" % variants_file)
-        sys.stderr.write(variants_file)
 
         if "sites" in json_dict:
             for site in json_dict["sites"]:
@@ -1095,7 +1094,7 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
     out_entries = [record.id, "|".join(constellation_calls), "|".join([n.mrca_lineage for n in constellations_called])]
 
     if list_incompatible:
-        out_entries.append("|".join([n.incompatible for n in constellations_called]))
+        out_entries.append("|".join([n.incompatible_lineage_calls for n in constellations_called]))
     if long and best_counts is not None:
         out_entries.append("%i,%i,%i,%i,%i,%f,%f" % (best_counts['ref'],
                                                      best_counts['alt'], best_counts['ambig'],
@@ -1203,10 +1202,12 @@ def list_constellations(list_constellation_files, constellation_names, reference
 
     list_of_constellations = set()
     for constellation_file in list_constellation_files:
-        constellation = Constellation(reference, constellation_file, constellation_names, label=label)
+        constellation = Constellation(from_file=True, reference=reference, variants_file=constellation_file, label=label)
         if not constellation.output_name:
             continue
-        if constellation_names and constellation.output_name not in constellation_names and constellation.name not in constellation_names:
+        if constellation_names \
+                and constellation.output_name not in constellation_names \
+                and constellation.name not in constellation_names:
             continue
         if len(constellation.variants) > 0 and constellation.mrca_lineage:
             list_of_constellations.add(constellation.output_name)
@@ -1214,7 +1215,6 @@ def list_constellations(list_constellation_files, constellation_names, reference
         elif len(constellation.variants) > 0:
             list_of_constellations.add(constellation.output_name)
     print("\n".join(list_of_constellations))
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="""Type an alignment at specific sites and classify with a barcode.""",
