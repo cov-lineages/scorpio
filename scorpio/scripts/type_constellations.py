@@ -243,8 +243,11 @@ def variant_to_variant_record(l, reference, ignore_fails=False):
 
 
 class Constellation:
-    def __init__(self, name, variants):
-        self.variants = variants
+    def __init__(self, from_file=False, name=None, variants_list=None, reference=None, variants_file=None,
+                 include_ancestral=False, label=None, ignore_fails=False):
+        self.variants = variants_list
+        if not self.variants:
+            self.variants = []
         self.name = name
         self.rules = None
 
@@ -252,24 +255,13 @@ class Constellation:
         self.incompatible_lineage_calls = ""
         self.parent_lineage = None
         self.lineage_name = None
-
-        self.variants = sorted(self.variants, key=lambda x: int(x["ref_start"]))
-        self.output_name = name
-
-    def __init__(self, reference, variants_file, include_ancestral=False, label=None, ignore_fails=False):
-        self.variants = []
-        self.name = None
-        self.rules = None
-
-        self.mrca_lineage = ""
-        self.incompatible_lineage_calls = ""
-        self.parent_lineage = None
-        self.lineage_name = None
-
         self.output_name = None
 
-        self.parse_variants_in(reference, variants_file, include_ancestral, label, ignore_fails)
-
+        if from_file:
+            self.parse_variants_in(reference, variants_file, include_ancestral, label, ignore_fails)
+        else:
+            self.variants = sorted(self.variants, key=lambda x: int(x["ref_start"]))
+            self.output_name = name
 
     def parse_name_from_file(self, constellation_file):
         name = constellation_file.split('/')[-1]
@@ -417,6 +409,11 @@ class Constellation:
         returns variants which is a list of dicts of snps, aas and dels,
         one dict per variant. format of subdict varies by variant type
         """
+        if not reference:
+            exit("No reference given")
+        if not variants_file:
+            exit("No variants file")
+
         if variants_file.endswith(".json"):
             self.parse_json_in(reference, variants_file, include_ancestral=include_ancestral, label=label,
                                ignore_fails=ignore_fails)
@@ -680,7 +677,8 @@ def load_constellations(list_constellation_files, constellation_names, reference
     lineage_name_dict = {}
 
     for constellation_file in list_constellation_files:
-        constellation = Constellation(reference, constellation_file, include_ancestral, label, ignore_fails)
+        constellation = Constellation(from_file=True, reference=reference, variants_file=constellation_file,
+                                      include_ancestral=include_ancestral, label=label, ignore_fails=ignore_fails)
         if constellation.lineage_name:
             lineage_name_dict[constellation.lineage_name] = constellation
 
@@ -731,7 +729,7 @@ def combine_constellations(constellation_dict):
             else:
                 variant_dict[variant["name"]] = variant
                 variant_dict[variant["name"]]["constellations"] = [constellation]
-    union_constellation = Constellation("union", variant_dict.values())
+    union_constellation = Constellation(from_file=False, name="union", variants_list=variant_dict.values())
     return union_constellation, constellation_count_dict
 
 
@@ -755,18 +753,13 @@ def combine_constellations_by_name(constellation_dict):
 def file_writer(out_csv, list_of_constellations, single_file_named_summary, q):
     """listens for messages on the q, writes to files. """
     handle_dict = {}
-    print("list_of_constellations", list_of_constellations)
     if len(list_of_constellations) == 1 and not single_file_named_summary:
         handle_dict[list_of_constellations[0]] = open(out_csv, "w")
-        print("open single name")
     elif len(list_of_constellations) == 1 and single_file_named_summary:
         handle_dict["summary"] = open(out_csv, "w")
-        print("open single summary")
     else:
-        print("open summary")
         handle_dict["summary"] = open(out_csv, "w")
         for constellation_name in list_of_constellations:
-            print("open named constellation")
             clean_name = re.sub("[^a-zA-Z0-9_\-.]", "_", constellation_name)
             handle_dict[constellation_name] = open("%s.%s.csv" % (out_csv.replace(".csv", ""), clean_name), "w")
 
@@ -805,8 +798,7 @@ def type_record(record, reference, constellation_names, constellation_dict, cons
                                                                                                    constellation_count_dict=copy.deepcopy(constellation_count_dict))
         if write_extended_files:
             columns = [record.id]
-            if single_file:
-                columns.append(''.join(barcode_list))
+            columns.append(''.join(barcode_list))
             if output_counts:
                 columns.append("%i,%i,%i,%i,%f,%f" % (counts['ref'], counts['alt'],
                                                       counts['ambig'], counts['oth'], counts['support'],
@@ -828,14 +820,12 @@ def type_record(record, reference, constellation_names, constellation_dict, cons
                 sorted_scores = sorted(scores, key=lambda x: float(x), reverse=True)
                 columns.append("; ".join([scores[score] for score in sorted_scores]))
             res = "%s\n" % ','.join(columns)
-            print("write individual result to individual file", res)
             q.put((constellation.output_name, res))
 
         out_list.append(''.join(barcode_list))
 
     res = "%s\n" % ",".join(out_list)
     if len(constellation_names) > 1 or not write_extended_files:
-        print("write extended result to summary", res)
         q.put(("summary", res))
     return res
 
@@ -860,13 +850,14 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
 
     if mutations_list:
         mutations_list, mutation_variants = parse_mutations_list(mutations_list, reference)
-        if len(constellation_dict) == 1 and "mutations" not in constellation_dict:
-            constellation = list(constellation_dict)[0]
+        if len(constellation_dict.keys()) == 1 and "mutations" not in constellation_dict.keys():
+            constellation = list(constellation_dict.keys())[0]
             new_constellation = "%s+%s" % (constellation, '|'.join(mutations_list))
             constellation_dict[new_constellation] = constellation_dict[constellation] + mutation_variants
             del constellation_dict[constellation]
         else:
-            constellation_dict["mutations"] = Constellation("mutations", mutation_variants)
+            constellation_dict["mutations"] = Constellation(from_file=False, name="mutations",
+                                                            variants_list=mutation_variants)
 
     if dry_run:
         return
@@ -891,15 +882,14 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
     pool = mp.Pool(threads)
 
     write_extended_files = append_genotypes or output_counts
-    print("write_extended_files", write_extended_files)
 
     single_file_named_summary = False
-    if len(constellation_names) > 1 or not write_extended_files:
+    if len(constellation_names) == 1 and not write_extended_files:
         single_file_named_summary = True
+
+    if len(constellation_names) > 1 or single_file_named_summary:
         header = "query,%s\n" % ",".join(constellation_names)
         q.put(("summary", header))
-
-    print("single_file_named_summary", single_file_named_summary)
 
     # put listener to work first
     list_constellation_names = constellation_names
@@ -941,10 +931,10 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
         job.get()
 
     # now we are done, kill the listener
-    if len(list_constellation_names) > 1 or single_file_named_summary:
+    if len(constellation_names) > 1 or single_file_named_summary:
         q.put(("summary", 'kill'))
 
-    if not single_file_named_summary:
+    if len(constellation_names) > 1 or not single_file_named_summary:
         for constellation_name in list_constellation_names:
             q.put((constellation_name, "kill"))
 
@@ -1006,12 +996,8 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
                          % record.id)
         sys.exit(1)
 
-    print("call record for", record.id)
     list_constellation_names = list(set(constellation_names))
-    print("constellation names", constellation_names)
-    print("list constellation names", list_constellation_names)
     single_file = len(list_constellation_names) == 1 and output_counts
-    print("single file", single_file)
 
     constellation_calls = []  # eg Probable Omicron
     constellations_called = []  # eg the omicron constellation class
@@ -1025,7 +1011,6 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
     for constellation in constellation_dict.values():
         if not constellation.output_name or (constellation.output_name not in list_constellation_names and constellation.name not in constellation_names):
             continue
-        print("Consider constellation %s" % constellation.name)
         logging.debug("Consider constellation %s" % constellation.name)
         parents = []
 
@@ -1034,16 +1019,16 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
         current_constellation = constellation
         while current_constellation.parent_lineage and current_constellation.parent_lineage in lineage_name_dict:
             logging.debug("Current %s in parent dict" % current_constellation.name)
-            print("consider parent", current_constellation.parent_lineage)
+            #print("consider parent", current_constellation.parent_lineage)
             #print(lineage_name_dict.keys())
             #print(lineage_name_dict[current_constellation.parent_lineage])
             current_constellation = lineage_name_dict[current_constellation.parent_lineage]
             parents.append(current_constellation.name)
             parent_counts, parent_call, parent_note = count_and_classify(record.seq,
                                                                          current_constellation)
-            print("parent call", parent_call)
+            #print("parent call", parent_call)
             counts, call, note = combine_counts_call_notes(counts, call, note, parent_counts, parent_call, parent_note)
-            print("overall call", call)
+            #print("overall call", call)
 
         for parent in parents:
             if parent not in children:
@@ -1051,10 +1036,10 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
             children[parent].append(constellation.name)
 
         if call:
-            print("have call", call)
-            print("current best", best_constellation)
-            print("children", children)
-            print("parents", parents)
+            #print("have call", call)
+            #print("current best", best_constellation)
+            #print("children", children)
+            #print("parents", parents)
             logging.debug("Have call for %s" % constellation.output_name)
             if call_all:
                 if call != "default":
@@ -1076,7 +1061,7 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
                 if constellation.mrca_lineage:
                     best_constellation = constellation
                     logging.debug("Set best constellation %s" % best_constellation.output_name)
-                    print("Set best constellation", best_constellation.output_name)
+                    #print("Set best constellation", best_constellation.output_name)
                     best_support = counts['support']
                     best_conflict = counts['conflict']
                     best_counts = counts
@@ -1089,12 +1074,15 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
                 scores[score] = summary
 
         if output_counts:
-            res = "%s,%i,%i,%i,%i,%i,%f,%f,%s,%s,%s\n" % (
+            out_entries = ["%s,%i,%i,%i,%i,%i,%f,%f,%s,%s,%s" % (
                     record.id, counts['ref'], counts['alt'], counts['ambig'],
                     counts['oth'], counts['rules'], counts['support'],
-                    counts['conflict'], call, constellation.output_name, note)
+                    counts['conflict'], call, constellation.output_name, note)]
+            if mutations_list and single_file:
+                barcode_list, counts, ignore, ignore2 = generate_barcode(record.seq, mutation_variants)
+                out_entries.extend(barcode_list)
+            res = "%s\n" % ','.join(out_entries)
             q.put((constellation.output_name, res))
-            print("wrote full results to named file", res)
 
     if not call_all and best_constellation:
         if best_call != "default":
@@ -1125,10 +1113,8 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
         out_entries.extend(barcode_list)
 
     res = "%s\n" % ",".join(out_entries)
-    print(res)
     if not single_file:
         q.put(("summary", res))
-        print("wrote abbreviated results to summary file", res)
 
     return res
 
@@ -1145,13 +1131,10 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
                                                                                     include_ancestral=True,
                                                                                     rules_required=True,
                                                                                     ignore_fails=True)
-    #print(constellation_names)
-    #print(constellation_dict.keys())
+
     if not constellation_names:
         constellation_names = [c.output_name for c in constellation_dict.values() if c.output_name not in ["None", "", None]]
     constellation_names = list(set(constellation_names))
-    #print(constellation_names)
-    #print(constellation_dict.keys())
     logging.debug("lineage_name_dict: %s" % lineage_name_dict)
 
     mutation_variants = None
@@ -1167,7 +1150,6 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
 
     # put listener to work first
     list_constellation_names = list(set(constellation_names))
-    #print(list_constellation_names)
     single_file = len(list_constellation_names) == 1 and output_counts
     if single_file:
         long = True
@@ -1181,16 +1163,13 @@ def classify_constellations(in_fasta, list_constellation_files, constellation_na
     columns = get_columns(list_incompatible, long, call_all, mutations_list, single_file)
     header = "%s\n" % ",".join(columns)
     if single_file:
-        print("add header to single file", list_constellation_names[0])
         q.put((list_constellation_names[0], header))
     else:
-        print("add header to summary")
         q.put(("summary", header))
 
         header = "query,ref_count,alt_count,ambig_count,other_count,rule_count,support,conflict,call,constellation_name,note\n"
         for constellation_name in list_constellation_names:
             q.put((constellation_name, header))
-            print("add header to", constellation_name)
 
     # fire off workers
     jobs = []
