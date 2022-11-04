@@ -130,12 +130,12 @@ class Reference:
 
         in_json.close()
 
-    def update_feature_dict(self):
-        for feature in self.feature_dict:
-            if len(self.feature_dict[feature]) > 2:
-                cds, aa_pos = resolve_ambiguous_cds(self.feature_dict[feature][2], self.feature_dict[feature][0], self.feature_dict)
+    def update_features_dict(self):
+        for feature in self.features_dict:
+            if len(self.features_dict[feature]) > 2:
+                cds, aa_pos = resolve_ambiguous_cds(self.features_dict[feature][2], self.features_dict[feature][0], self.features_dict)
                 if aa_pos:
-                    self.feature_dict[feature] = (aa_pos, self.feature_dict[feature][1] + self.feature_dict[feature][0] - aa_pos, cds)
+                    self.features_dict[feature] = (aa_pos, self.features_dict[feature][1] + self.features_dict[feature][0] - aa_pos, cds)
 
 
 def variant_to_variant_record(l, reference, ignore_fails=False):

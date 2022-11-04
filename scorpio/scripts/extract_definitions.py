@@ -66,7 +66,8 @@ def get_group_dict(in_variants, group_column, index_column, subset):
             sys.exit(-1)
         if index_column not in reader.fieldnames:
             logging.warning("Index column %s not found in input file %s" %(index_column, in_variants))
-            sys.exit(-1)
+            index_column = reader.fieldnames[0]
+            logging.warning("Using index column %s" % index_column)
         for row in reader:
             if group_column in row and index_column in row:
                 if subset and row[group_column] not in subset:
@@ -136,22 +137,22 @@ def translate_if_possible(nuc_start, nuc_ref, nuc_alt, reference, include_protei
     #print(reference_seq[nuc_start-5: nuc_end+5])
     #print(query_seq[nuc_start-5: nuc_end+5])
 
-    for feature in reference.feature_dict:
-        if len(reference.feature_dict[feature]) > 2:
+    for feature in reference.features_dict:
+        if len(reference.features_dict[feature]) > 2:
             continue # ignore nsp definitions
-        if reference.feature_dict[feature][0] <= nuc_start <= reference.feature_dict[feature][1]:
+        if reference.features_dict[feature][0] <= nuc_start <= reference.features_dict[feature][1]:
             start, end = nuc_start, nuc_end
-            while (start - reference.feature_dict[feature][0]) % 3 != 0:
+            while (start - reference.features_dict[feature][0]) % 3 != 0:
                 start -= 1
-            while (end - reference.feature_dict[feature][0]) % 3 != 0:
+            while (end - reference.features_dict[feature][0]) % 3 != 0:
                 end += 1
             ref_allele = Seq(reference.reference_seq[start - 1:end - 1 ]).translate()
             query_allele = Seq(query_seq[start - 1:end - 1]).translate()
             if ref_allele == query_allele:
                 return "nuc:%s%i%s" % (nuc_ref, nuc_start, nuc_alt)
-            aa_pos = int((start - feature_dict[feature][0]) / 3) + 1
+            aa_pos = int((start - features_dict[feature][0]) / 3) + 1
             if include_protein:
-                feature, aa_pos = translate_to_protein_if_possible(feature, aa_pos, reference.feature_dict)
+                feature, aa_pos = translate_to_protein_if_possible(feature, aa_pos, reference.features_dict)
             #print(start, end, ref_allele, query_allele, aa_pos, feature)
             return "%s:%s%i%s" % (feature, ref_allele, aa_pos, query_allele)
     return "nuc:%s%i%s" % (nuc_ref, nuc_start, nuc_alt)
@@ -161,12 +162,12 @@ def translate_to_protein_if_possible(cds, aa_start, reference):
     if not cds.startswith("orf"):
         return cds, aa_start
 
-    for feature in reference.feature_dict:
-        if len(reference.feature_dict[feature]) < 3:
+    for feature in reference.features_dict:
+        if len(reference.features_dict[feature]) < 3:
             continue  # only want nsp definitions
-        if reference.feature_dict[feature][2] == cds:
-            if reference.feature_dict[feature][0] <= aa_start <= reference.feature_dict[feature][1]:
-                return feature, aa_start-reference.feature_dict[feature][0]+1
+        if reference.features_dict[feature][2] == cds:
+            if reference.features_dict[feature][0] <= aa_start <= reference.features_dict[feature][1]:
+                return feature, aa_start-reference.features_dict[feature][0]+1
     return cds, aa_start
 
 def define_mutations(list_variants, reference, include_protein=False, skip_translate=False):
@@ -268,7 +269,7 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
     group_dict = get_group_dict(in_groups, group_column, index_column, groups_to_get)
 
     reference = Reference(reference_json)
-    reference.update_feature_dict()
+    reference.update_features_dict()
 
     var_dict = {}
     outgroup_var_dict = {}
@@ -278,11 +279,15 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
         reader = csv.DictReader(csv_in, delimiter=",", quotechar='\"', dialect = "unix")
         if index_column not in reader.fieldnames:
             logging.warning("Index column %s not found in %s" % (index_column, in_variants))
+            index_column = reader.fieldnames[0]
+            logging.warning("Using index column %s" % index_column)
 
         if "nucleotide_variants" in reader.fieldnames:
             var_column = "nucleotide_variants"
         elif "nucleotide_mutations" in reader.fieldnames:
             var_column = "nucleotide_mutations"
+        elif "mutations" in reader.fieldnames:
+            var_column = "mutations"
         else:
             logging.warning("No nucleotide_variants or nucleotide_mutations columns found")
             sys.exit(-1)
