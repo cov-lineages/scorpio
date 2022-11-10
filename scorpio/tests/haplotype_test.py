@@ -15,17 +15,18 @@ data_dir = os.path.join(this_dir, 'tests', 'data')
 
 reference_json = "%s/SARS-CoV-2.json" % data_dir
 
-constellations_dir = constellations.__path__[0]
+constellations_dir = os.path.join(data_dir, 'constellations')
 list_constellation_files = []
-constellation_subdirs = ["definitions"]
-for dir in constellation_subdirs:
-    c_dir = os.path.join(constellations_dir, dir)
-    for r, d, f in os.walk(c_dir):
-        for fn in f:
-            if r.endswith('definitions') and fn.endswith(".json"):
-                list_constellation_files.append(os.path.join(r, fn))
+for r, d, f in os.walk(constellations_dir):
+    for fn in f:
+        if fn.endswith(".json"):
+            list_constellation_files.append(os.path.join(r, fn))
 
 input = "%s/alignment.fa" % data_dir
+
+#names_up_to_constellations_v0_1_4 = [
+#    "B.1.617.1-like","Delta (AY.4.2-like)","Omicron (BA.1-like)","Zeta (P.2-like)","Eta (B.1.525-like)","Delta (B.1.617.2-like) +K417N","Theta (P.3-like)","Mu (B.1.621-like)","Epsilon (B.1.427-like)","AV.1-like","Epsilon (B.1.429-like)","A.23.1-like","Lambda (C.37-like)","Beta (B.1.351-like)","B.1.1.318-like","Omicron (BA.3-like)","B.1.617.3-like","Alpha (B.1.1.7-like)","B.1.1.7-like+E484K","Omicron (Unassigned)","Delta (B.1.617.2-like)","Omicron (BA.2-like)","Gamma (P.1-like)","A.23.1-like+E484K","Iota (B.1.526-like)","Delta (AY.4-like)"
+#]
 
 default = {"names": [],
            "ref_char": "-",

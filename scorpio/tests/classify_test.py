@@ -200,6 +200,30 @@ def test_classify_names():
     assert filecmp.cmp(out_csv, expected, shallow=False)
     os.unlink(out_csv)
 
+def test_classify_names_including_unassigned():
+    run_name = "names_classify_label"
+    out_csv = "%s/classify/%s.csv" %(data_dir, run_name)
+    names = ['B.1.617.1-like', 'Delta (AY.4.2-like)', 'Omicron (BA.1-like)', 'Zeta (P.2-like)', 'Omicron (Unassigned)']
+
+    classify_constellations(input,
+                            list_constellation_files,
+                            names,
+                            out_csv,
+                            reference_json,
+                            default["output_counts"],
+                            default["call_all"],
+                            default["long"],
+                            "mrca_lineage",
+                            default["list_incompatible"],
+                            default["mutations"],
+                            default["dry_run"],
+                            default["interspersion"],
+                            default["threads"])
+
+    expected = "%s/classify/expected.%s.csv" % (data_dir, run_name)
+    assert filecmp.cmp(out_csv, expected, shallow=False)
+    os.unlink(out_csv)
+
 def test_classify_single_output_counts():
     run_name = "single_output_counts_classify"
     out_csv = "%s/classify/%s.csv" %(data_dir, run_name)

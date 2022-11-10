@@ -1041,8 +1041,10 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
             #print("parents", parents)
             logging.debug("Have call for %s" % constellation.output_name)
             if call_all:
-                if call != "default":
+                if call != "default" and constellation.output_name not in ["",None,"None"]:
                     called_constellation_name = "%s %s" % (call, constellation.output_name)
+                elif constellation.output_name in [None,"None"]:
+                    called_constellation_name = ""
                 else:
                     called_constellation_name = constellation.output_name
                 constellation_calls.append(called_constellation_name)
@@ -1084,8 +1086,10 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
             q.put((constellation.output_name, res))
 
     if not call_all and best_constellation:
-        if best_call != "default":
+        if best_call != "default" and best_constellation.output_name not in ["",None,"None"]:
             best_constellation_name = "%s %s" % (best_call, best_constellation.output_name)
+        elif best_constellation.output_name in [None, "None"]:
+            best_constellation_name = ""
         else:
             best_constellation_name = best_constellation.output_name
         constellation_calls.append(best_constellation_name)
