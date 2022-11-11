@@ -24,6 +24,7 @@ for dir in constellation_subdirs:
         for fn in f:
             if r.endswith('definitions') and fn.endswith(".json"):
                 list_constellation_files.append(os.path.join(r, fn))
+sorted(list_constellation_files)
 
 input = "%s/alignment.fa" % data_dir
 
