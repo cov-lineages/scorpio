@@ -1097,7 +1097,7 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
 
     if len(constellation_calls) > 1:
         zipped = zip(constellation_calls, constellations_called)
-        zipped = sorted(zipped, key=lambda x: x[1].output_name)
+        zipped = sorted(zipped, key=lambda x: x[1].name)
         constellation_calls = [x for x, y in zipped]
         constellations_called = [y for x,y in zipped]
 

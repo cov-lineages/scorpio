@@ -242,19 +242,20 @@ def main(sysargs = sys.argv[1:]):
             args.reference_json = reference_json
             logging.info("Found reference %s" %args.reference_json)
         if not args.constellations and args.command in ['haplotype', 'classify', 'list']:
+            sorted(list_constellation_files)
             args.constellations = list_constellation_files
             logging.info("Found constellations:")
             for c in args.constellations:
                 logging.info(c)
             logging.info("\n")
 
-        if "call_all" in args and args.call_all and args.long and args.verbose:
-            logging.info("Cannot provide long format summary file with multiple calls, ignoring --long\n")
+    if "call_all" in args and args.call_all and args.long and args.verbose:
+        logging.info("Cannot provide long format summary file with multiple calls, ignoring --long\n")
 
-        if "append_genotypes" in args and args.append_genotypes and not args.ref_char:
-            args.ref_char = None
-        elif "ref_char" in args and not args.ref_char:
-            args.ref_char = '-'
+    if "append_genotypes" in args and args.append_genotypes and not args.ref_char:
+        args.ref_char = None
+    elif "ref_char" in args and not args.ref_char:
+        args.ref_char = '-'
 
     """
     Exit with help menu if no args supplied
