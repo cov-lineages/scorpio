@@ -1096,15 +1096,10 @@ def classify_record(record, reference, constellation_names, constellation_dict, 
         constellations_called.append(best_constellation)
 
     if len(constellation_calls) > 1:
-        a = list(set(constellation_calls))
-        a.sort()
-        res = []
-        for i in a:
-            for j in range(0, len(constellation_calls)):
-                if (constellation_calls[j] == i):
-                    res.append(constellations_called[j])
-        constellations_called = res
-    constellation_calls.sort()
+        zipped = zip(constellation_calls, constellations_called)
+        zipped = sorted(zipped, key=lambda x: x[1].output_name)
+        constellation_calls = [x for x, y in zipped]
+        constellations_called = [y for x,y in zipped]
 
     out_entries = [record.id, "|".join(constellation_calls), "|".join([n.mrca_lineage for n in constellations_called])]
 
