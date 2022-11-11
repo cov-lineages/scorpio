@@ -242,7 +242,7 @@ def main(sysargs = sys.argv[1:]):
             args.reference_json = reference_json
             logging.info("Found reference %s" %args.reference_json)
         if not args.constellations and args.command in ['haplotype', 'classify', 'list']:
-            sorted(list_constellation_files)
+            list_constellation_files.sort()
             args.constellations = list_constellation_files
             logging.info("Found constellations:")
             for c in args.constellations:
