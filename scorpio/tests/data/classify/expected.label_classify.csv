@@ -1,0 +1,21 @@
+query,constellations,mrca_lineage,constellation_name
+Flatland/B.1.1.7/2021,B.1.1.7,B.1.1.7,Alpha (B.1.1.7-like)
+Flatland/B.1.351/2021,B.1.351,B.1.351,Beta (B.1.351-like)
+Flatland/P.1/2021,P.1,P.1,Gamma (P.1-like)
+Flatland/P.1_again/2021,P.1,P.1,Gamma (P.1-like)
+Flatland/B.1.617.1/2021,B.1.617.1,B.1.617.1,B.1.617.1-like
+Flatland/B.1.617.2/2021,B.1.617.2,B.1.617.2,Delta (B.1.617.2-like)
+Flatland/B.1.617.2_K417N/2021,B.1.617.2,B.1.617.2,Delta (B.1.617.2-like) +K417N
+Flatland/AY.4/2021,AY.4,AY.4,Delta (AY.4-like)
+Flatland/AY.4.2/2021,AY.4.2,AY.4.2,Delta (AY.4.2-like)
+Flatland/B.1.427/2021,B.1.427,B.1.427,Epsilon (B.1.427-like)
+Flatland/B.1.429/2021,B.1.429,B.1.429,Epsilon (B.1.429-like)
+Flatland/B.1.526/2021,B.1.526,B.1.526,Iota (B.1.526-like)
+Flatland/P.3/2021,P.3,P.3,Theta (P.3-like)
+Flatland/B.1.525/2020,B.1.525,B.1.525,Eta (B.1.525-like)
+Flatland/P.2/2021,P.2,P.2,Zeta (P.2-like)
+Flatland/C.37/2021,C.37,C.37,Lambda (C.37-like)
+Flatland/BA.1/2022,BA.1,BA.1,Omicron (BA.1-like)
+Flatland/BA.2/2022,BA.2,BA.2,Omicron (BA.2-like)
+Flatland/BA.3/2022,BA.3,BA.3,Omicron (BA.3-like)
+Flatland/XE/2022,XE,XE,Omicron (XE-like)

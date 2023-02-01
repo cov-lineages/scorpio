@@ -29,8 +29,6 @@ def main(sysargs = sys.argv[1:]):
     common = argparse.ArgumentParser(prog=_program, add_help=False)
 
     io_group = common.add_argument_group('Input/output options')
-    io_group.add_argument("-i", "--input", dest="input", required=False, help="Primary input file")
-    io_group.add_argument("-m", "--metadata", dest="metadata", required=False, help="CSV of associated metadata")
     io_group.add_argument("-o", "--output", dest="output", required=False, help="Output file or path")
     io_group.add_argument("-p", "--prefix", dest="prefix", required=False, help="Output prefix. Default: scorpio")
     io_group.add_argument("--log-file", dest="log_file", metavar='<filename>', required=False,
@@ -49,38 +47,42 @@ def main(sysargs = sys.argv[1:]):
     constellation_group.add_argument("--mutations", dest="mutations", required=False, nargs='+',
                                      help="Extra mutations to type")
 
+    reference_group = common.add_argument_group('Reference options')
+    reference_group.add_argument('--reference-json', dest="reference_json",
+                                 help='JSON file containing keys "genome" with reference sequence '
+                                 'and "proteins", "features" or "genes" with features of interest'
+                                 ' and their coordinates')
+
     misc_group = common.add_argument_group('Misc options')
     misc_group.add_argument("--verbose", action="store_true", help="Print lots of stuff to screen")
     misc_group.add_argument("--dry-run", dest="dry_run", action="store_true", help="Quit after checking constellations and variants are AOK")
-    misc_group.add_argument('-t', '--threads', action='store', dest="threads", type=int, help="Number of threads")
+    misc_group.add_argument('-t', '--threads', action='store', dest="threads", type=int, default=1, help="Number of threads")
 
     # _______________________________  classify  __________________________________#
 
     subparser_classify = subparsers.add_parser(
         "classify",
         parents=[common],
-        help="Takes a set of lineage-defining constellations with rules and classifies sequences by them"
+        help="Takes a set of lineage-defining constellations with rules and classifies sequences by them. "
+             "Output is a summary file with a row per sample recording its constellation classification"
     )
-    subparser_classify.add_argument(
-        '--reference-json', dest="reference_json", help='JSON file containing keys "genome" with reference sequence '
-                                 'and "proteins", "features" or "genes" with features of interest'
-                                 ' and their coordinates'
-    )
+    subparser_classify.add_argument("-i", "--input", dest="input", required=True, help="Primary input file - an aligned FASTA")
+
     subparser_classify.add_argument(
         "--output-counts", dest="output_counts", action="store_true",
-        help="Save a file per constellation of ref, alt and other counts"
+        help="Save a file per constellation with columns for the ref, alt, ambig and other counts as well as a True/False call for each sample"
     )
     subparser_classify.add_argument(
         "--call-all", dest="call_all", action="store_true",
-        help="Allow multiple classifications"
+        help="Allow multiple classifications and output these as a pipe separated list in the summary file"
     )
     subparser_classify.add_argument(
         "--long", dest="long", action="store_true",
-        help="Write out summary file in long format"
+        help="Write out summary file in long format, including the counts for the winning constellation"
     )
     subparser_classify.add_argument(
         "--list-incompatible", dest="list_incompatible", action="store_true",
-        help="Adds column listing incompatible lineages listed in JSON"
+        help="Adds column to the summary file listing incompatible lineages for the winning constellation as listed in the constellation JSON"
     )
 
     subparser_classify.set_defaults(func=scorpio.subcommands.classify.run)
@@ -90,24 +92,22 @@ def main(sysargs = sys.argv[1:]):
     subparser_haplotype = subparsers.add_parser(
         "haplotype",
         parents=[common],
-        help="Takes a set of constellations and writes haplotypes (either as strings or individual columns)",
+        help="Takes a set of constellations and writes haplotypes (either as strings or individual columns)."
+             "Output is a summary file with a row per sample and columns recording haplotypes or haplotype barcodes",
     )
+    subparser_haplotype.add_argument("-i", "--input", dest="input", required=True, help="Primary input file - an aligned FASTA")
+
     subparser_haplotype.add_argument(
-        '--reference-json', dest="reference_json", help='JSON file containing keys "genome" with reference sequence '
-                                 'and "proteins", "features" or "genes" with features of interest'
-                                 ' and their coordinates'
-    )
-    subparser_haplotype.add_argument(
-        "--ref-char", dest="ref_char", required=False,
-        help="Symbol to use to represent reference allele"
+        "--ref-char", dest="ref_char", required=False, default='-',
+        help="Symbol to use to represent reference allele in barcode strings"
     )
     subparser_haplotype.add_argument(
         "--output-counts", dest="output_counts", action="store_true",
-        help="Save a file per constellation of ref, alt and other counts"
+        help="Save a file per constellation with columns for the ref, alt, ambig and other counts as well as a True/False call for each sample"
     )
     subparser_haplotype.add_argument(
         "--append-genotypes", dest="append_genotypes", action="store_true",
-        help="Output a column per variant with the call"
+        help="Output a column per variant site instead of a barcode string. If only a single constellation is being typed, this will be placed in the summary file, otherwise in a file per constellation"
     )
     subparser_haplotype.add_argument(
         "--combination", dest="combination", action="store_true",
@@ -115,20 +115,10 @@ def main(sysargs = sys.argv[1:]):
     )
     subparser_haplotype.add_argument(
         "--interspersion", dest="interspersion", action="store_true",
-        help="Evaluates an interspersion score"
+        help="Evaluates an interspersion score (dev feature)"
     )
     subparser_haplotype.set_defaults(func=scorpio.subcommands.haplotype.run)
 
-    # _______________________________  report  __________________________________#
-
-    subparser_report = subparsers.add_parser(
-        "report",
-        parents=[common],
-        help="Merges two fasta files avoiding duplicates based on matches to "
-             "metadata (takes the one in the first file)",
-    )
-
-    subparser_report.set_defaults(func=scorpio.subcommands.report.run)
 
     # _______________________________  define  __________________________________#
 
@@ -138,11 +128,8 @@ def main(sysargs = sys.argv[1:]):
         help="Takes a CSV column of per sample mutations, and a column defining groups and extracts group-defining "
              "mutations",
     )
-    subparser_define.add_argument(
-        '--reference-json', dest="reference_json", help='JSON file containing keys "genome" with reference sequence '
-                                                        'and "proteins", "features" or "genes" with features of interest'
-                                                        ' and their coordinates'
-    )
+    subparser_define.add_argument("-i", "--input", dest="input", required=True, help="Primary input file - a CSV")
+
     subparser_define.add_argument(
         '--in-groups', dest='in_groups', required=False,
         help='CSV of containing sequence_name and a column defining groups ')
@@ -179,11 +166,6 @@ def main(sysargs = sys.argv[1:]):
         "list",
         parents=[common],
         help="Lists the constellations installed that would be typed/classified with the provided input options",
-    )
-    subparser_list.add_argument(
-        '--reference-json', dest="reference_json", help='JSON file containing keys "genome" with reference sequence '
-                                                        'and "proteins", "features" or "genes" with features of interest'
-                                                        ' and their coordinates'
     )
 
     subparser_list.set_defaults(func=scorpio.subcommands.list.run)
@@ -260,19 +242,20 @@ def main(sysargs = sys.argv[1:]):
             args.reference_json = reference_json
             logging.info("Found reference %s" %args.reference_json)
         if not args.constellations and args.command in ['haplotype', 'classify', 'list']:
+            list_constellation_files.sort()
             args.constellations = list_constellation_files
             logging.info("Found constellations:")
             for c in args.constellations:
                 logging.info(c)
             logging.info("\n")
 
-        if "call_all" in args and args.call_all and args.long and args.verbose:
-            logging.info("Cannot provide long format summary file with multiple calls, ignoring --long\n")
+    if "call_all" in args and args.call_all and args.long and args.verbose:
+        logging.info("Cannot provide long format summary file with multiple calls, ignoring --long\n")
 
-        if "append_genotypes" in args and args.append_genotypes and not args.ref_char:
-            args.ref_char = None
-        elif "ref_char" in args and not args.ref_char:
-            args.ref_char = '-'
+    if "append_genotypes" in args and args.append_genotypes and not args.ref_char:
+        args.ref_char = None
+    elif "ref_char" in args and not args.ref_char:
+        args.ref_char = '-'
 
     """
     Exit with help menu if no args supplied

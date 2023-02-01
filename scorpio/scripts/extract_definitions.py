@@ -9,7 +9,7 @@ import logging
 from Bio.Seq import Seq
 from operator import itemgetter
 
-from .type_constellations import load_feature_coordinates, resolve_ambiguous_cds
+from .type_constellations import Reference
 
 def parse_args():
     parser = argparse.ArgumentParser(description="""Pick a representative sample for each unique sequence""",
@@ -61,9 +61,17 @@ def get_group_dict(in_variants, group_column, index_column, subset):
 
     with open(in_variants,"r") as f:
         reader = csv.DictReader(f)
+        if group_column not in reader.fieldnames:
+            logging.warning("Group column %s not found in input file %s" %(group_column, in_variants))
+            sys.exit(-1)
+        if index_column not in reader.fieldnames:
+            logging.warning("Index column %s not found in input file %s" %(index_column, in_variants))
+            index_column = reader.fieldnames[0]
+            logging.warning("Using index column %s" % index_column)
         for row in reader:
             if group_column in row and index_column in row:
                 if subset and row[group_column] not in subset:
+                    logging.info("skip")
                     continue
                 if row[index_column] in group_dict:
                     logging.warning("%s is a duplicate in group CSV, keeping first" % row[index_column])
@@ -71,6 +79,9 @@ def get_group_dict(in_variants, group_column, index_column, subset):
                     group_dict[row[index_column]] = row[group_column]
                     groups.add(row[group_column])
 
+    if len(groups) == 0:
+        logging.warning("Found no groups to define")
+        sys.exit(-1)
     logging.info("Found %d groups" % len(groups))
 
     return group_dict
@@ -88,15 +99,6 @@ def update_var_dict(var_dict, group, variants):
         else:
             var_dict[group][var] = 1
     return
-
-
-def update_feature_dict(feature_dict):
-    for feature in feature_dict:
-        if len(feature_dict[feature]) > 2:
-            cds, aa_pos = resolve_ambiguous_cds(feature_dict[feature][2], feature_dict[feature][0], feature_dict)
-            if aa_pos:
-                feature_dict[feature] = (aa_pos, feature_dict[feature][1] + feature_dict[feature][0] - aa_pos, cds)
-    return feature_dict
 
 
 def get_common_mutations(var_dict, min_occurance=3, threshold_common=0.98, threshold_intermediate=0.25):
@@ -119,7 +121,7 @@ def get_common_mutations(var_dict, min_occurance=3, threshold_common=0.98, thres
     return common, intermediate
 
 
-def translate_if_possible(nuc_start, nuc_ref, nuc_alt, feature_dict, reference_seq, include_protein=False, skip=False):
+def translate_if_possible(nuc_start, nuc_ref, nuc_alt, reference, include_protein=False, skip=False):
     if skip:
          return "nuc:%s%i%s" % (nuc_ref, nuc_start, nuc_alt)
     nuc_end = nuc_start + len(nuc_ref)
@@ -129,46 +131,46 @@ def translate_if_possible(nuc_start, nuc_ref, nuc_alt, feature_dict, reference_s
     assert nuc_start > 10
     assert nuc_end > 10
     #print(nuc_start, nuc_end, reference_seq[nuc_start-1:nuc_end-1], nuc_ref, nuc_alt)
-    assert reference_seq[nuc_start-1:nuc_end-1] == nuc_ref
-    query_seq = reference_seq[:nuc_start-1] + nuc_alt + reference_seq[nuc_end-1:]
+    assert reference.refseq[nuc_start-1:nuc_end-1] == nuc_ref
+    query_seq = reference.refseq[:nuc_start-1] + nuc_alt + reference.refseq[nuc_end-1:]
     #print(len(reference_seq), len(query_seq), type(int(nuc_start-5)), type(int(nuc_end+5)))
     #print(reference_seq[nuc_start-5: nuc_end+5])
     #print(query_seq[nuc_start-5: nuc_end+5])
 
-    for feature in feature_dict:
-        if len(feature_dict[feature]) > 2:
+    for feature in reference.features_dict:
+        if len(reference.features_dict[feature]) > 2:
             continue # ignore nsp definitions
-        if feature_dict[feature][0] <= nuc_start <= feature_dict[feature][1]:
+        if reference.features_dict[feature][0] <= nuc_start <= reference.features_dict[feature][1]:
             start, end = nuc_start, nuc_end
-            while (start - feature_dict[feature][0]) % 3 != 0:
+            while (start - reference.features_dict[feature][0]) % 3 != 0:
                 start -= 1
-            while (end - feature_dict[feature][0]) % 3 != 0:
+            while (end - reference.features_dict[feature][0]) % 3 != 0:
                 end += 1
-            ref_allele = Seq(reference_seq[start - 1:end - 1 ]).translate()
+            ref_allele = Seq(reference.reference_seq[start - 1:end - 1 ]).translate()
             query_allele = Seq(query_seq[start - 1:end - 1]).translate()
             if ref_allele == query_allele:
                 return "nuc:%s%i%s" % (nuc_ref, nuc_start, nuc_alt)
-            aa_pos = int((start - feature_dict[feature][0]) / 3) + 1
+            aa_pos = int((start - features_dict[feature][0]) / 3) + 1
             if include_protein:
-                feature, aa_pos = translate_to_protein_if_possible(feature, aa_pos, feature_dict)
+                feature, aa_pos = translate_to_protein_if_possible(feature, aa_pos, reference.features_dict)
             #print(start, end, ref_allele, query_allele, aa_pos, feature)
             return "%s:%s%i%s" % (feature, ref_allele, aa_pos, query_allele)
     return "nuc:%s%i%s" % (nuc_ref, nuc_start, nuc_alt)
 
 
-def translate_to_protein_if_possible(cds, aa_start, feature_dict):
+def translate_to_protein_if_possible(cds, aa_start, reference):
     if not cds.startswith("orf"):
         return cds, aa_start
 
-    for feature in feature_dict:
-        if len(feature_dict[feature]) < 3:
+    for feature in reference.features_dict:
+        if len(reference.features_dict[feature]) < 3:
             continue  # only want nsp definitions
-        if feature_dict[feature][2] == cds:
-            if feature_dict[feature][0] <= aa_start <= feature_dict[feature][1]:
-                return feature, aa_start-feature_dict[feature][0]+1
+        if reference.features_dict[feature][2] == cds:
+            if reference.features_dict[feature][0] <= aa_start <= reference.features_dict[feature][1]:
+                return feature, aa_start-reference.features_dict[feature][0]+1
     return cds, aa_start
 
-def define_mutations(list_variants, feature_dict, reference_seq, include_protein=False, skip_translate=False):
+def define_mutations(list_variants, reference, include_protein=False, skip_translate=False):
     merged_list = []
     if not list_variants:
         return merged_list
@@ -212,7 +214,7 @@ def define_mutations(list_variants, feature_dict, reference_seq, include_protein
             elif new[3]:
                 current[3] = new[3]
         elif current[0] != "":
-            var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein, skip_translate)
+            var = translate_if_possible(current[1], current[0], current[2], reference, include_protein, skip_translate)
             if current[3]:
                 merged_list.append("%s:%s" % (var, current[3]))
             else:
@@ -221,7 +223,7 @@ def define_mutations(list_variants, feature_dict, reference_seq, include_protein
         else:
             current = new
     if current[0] != "":
-        var = translate_if_possible(current[1], current[0], current[2], feature_dict, reference_seq, include_protein, skip_translate)
+        var = translate_if_possible(current[1], current[0], current[2], reference, include_protein, skip_translate)
         if current[3]:
             merged_list.append("%s:%s" % (var, current[3]))
         else:
@@ -253,8 +255,10 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
                         threshold_common, threshold_intermediate, outgroup_file, include_protein, skip_translate):
     if not in_groups:
         in_groups = in_variants
+        logging.debug("Using input file %s for groups" % in_variants)
 
     outgroup_dict, outgroups = parse_outgroups(outgroup_file)
+    logging.debug("Parsed outgroups %s" % outgroups)
 
     groups_to_get = None
     if subset:
@@ -264,21 +268,26 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
 
     group_dict = get_group_dict(in_groups, group_column, index_column, groups_to_get)
 
-    reference_seq, feature_dict = load_feature_coordinates(reference_json)
-    feature_dict = update_feature_dict(feature_dict)
+    reference = Reference(reference_json)
+    reference.update_features_dict()
 
     var_dict = {}
     outgroup_var_dict = {}
 
+    logging.debug("Process file %s" % in_variants)
     with open(in_variants, 'r', newline = '') as csv_in:
         reader = csv.DictReader(csv_in, delimiter=",", quotechar='\"', dialect = "unix")
         if index_column not in reader.fieldnames:
             logging.warning("Index column %s not found in %s" % (index_column, in_variants))
+            index_column = reader.fieldnames[0]
+            logging.warning("Using index column %s" % index_column)
 
         if "nucleotide_variants" in reader.fieldnames:
             var_column = "nucleotide_variants"
         elif "nucleotide_mutations" in reader.fieldnames:
             var_column = "nucleotide_mutations"
+        elif "mutations" in reader.fieldnames:
+            var_column = "mutations"
         else:
             logging.warning("No nucleotide_variants or nucleotide_mutations columns found")
             sys.exit(-1)
@@ -310,9 +319,11 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
         if group in outgroup_var_dict:
             outgroup_common, outgroup_intermediate = get_common_mutations(outgroup_var_dict[group], min_occurance=1, threshold_common=threshold_common, threshold_intermediate=threshold_intermediate)
             common, ancestral = subtract_outgroup(common, outgroup_common)
-        nice_common = define_mutations(common, feature_dict, reference_seq, include_protein, skip_translate)
-        nice_intermediate = define_mutations(intermediate, feature_dict, reference_seq, include_protein, skip_translate)
-        nice_ancestral = define_mutations(ancestral, feature_dict, reference_seq, include_protein, skip_translate)
+        logging.debug("Niceify results")
+        nice_common = define_mutations(common, reference, include_protein, skip_translate)
+        nice_intermediate = define_mutations(intermediate, reference, include_protein, skip_translate)
+        nice_ancestral = define_mutations(ancestral, reference, include_protein, skip_translate)
+        logging.debug("Write constellations out to prefix %s" % prefix)
         write_constellation(prefix, group, nice_common, nice_intermediate, nice_ancestral)
 
 

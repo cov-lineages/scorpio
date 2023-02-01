@@ -16,4 +16,5 @@ def run(options):
                         options.mutations,
                         options.dry_run,
                         options.combination,
-                        options.interspersion)
+                        options.interspersion,
+                        options.threads)
