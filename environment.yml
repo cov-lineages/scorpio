@@ -8,6 +8,6 @@ dependencies:
   - wget
   - biopython>=1.74
   - pip
-  - python>=3.6
+  - python==3.8
   - pip:
     - git+https://github.com/cov-lineages/constellations.git
