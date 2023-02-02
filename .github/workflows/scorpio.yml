@@ -18,7 +18,6 @@ jobs:
           environment-file: environment.yml
           activate-environment: scorpio
           channels: conda-forge,bioconda,defaults
-          mamba-version: "*"
       - name: Install scorpio
         run: pip install -e .
       - name: Install pytest
