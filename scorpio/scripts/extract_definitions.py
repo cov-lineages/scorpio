@@ -2,14 +2,13 @@
 
 import sys
 import csv
-import operator
 import argparse
 import json
 import logging
 from Bio.Seq import Seq
 from operator import itemgetter
 
-from .type_constellations import Reference, Constellation, Variant
+from .definitions import Reference, Constellation, Variant
 
 def parse_args():
     parser = argparse.ArgumentParser(description="""Pick a representative sample for each unique sequence""",
@@ -122,9 +121,9 @@ def merge_and_translate_nucs(list_variants, reference, include_protein, skip_tra
         else:
             current = new
     if current[0] != "":
-        print(current)
+        #print(current)
         var = translate_if_possible(current[1], current[0], current[2], reference, include_protein, skip_translate)
-        print(var)
+        #print(var)
         merged_list.append(var)
 
     return merged_list
@@ -244,18 +243,30 @@ def translate_to_protein_if_possible(cds, aa_start, reference):
     return cds, aa_start
 
 
-def subtract_outgroup(common, outgroup_common):
+def subtract_outgroup(common, outgroup_common, intermediate, reference):
     updated_common = []
     ancestral = []
+    ancestral_remainder = outgroup_common
+    updated_intermediate = intermediate
     for var in common:
         for comp in outgroup_common:
-            if var.name == comp.name:
+            if var.equals(comp, reference):
                 ancestral.append(var)
-            elif var.ref_start == comp.ref_start and var.type == "snp":
-                ancestral.append(var)
+                ancestral_remainder.remove(comp)
+                break
         else:
             updated_common.append(var)
-    return updated_common, ancestral
+    for var in intermediate:
+        for comp in outgroup_common:
+            if var.equals(comp, reference):
+                ancestral.append(var)
+                ancestral_remainder.remove(comp)
+                updated_intermediate.remove(var)
+                break
+    print("ancestral_remainder")
+    for comp in ancestral_remainder:
+        comp.print()
+    return updated_common, ancestral, updated_intermediate
 
 
 def write_constellation(prefix, group, list_variants, list_intermediates, list_ancestral):
@@ -338,9 +349,9 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
         #print("found", common, intermediate)
         if group in outgroup_var_dict:
             outgroup_common, outgroup_intermediate = get_common_mutations(outgroup_var_dict[group], min_occurance=1, threshold_common=threshold_common, threshold_intermediate=threshold_intermediate)
-            common, ancestral = subtract_outgroup(common, outgroup_common)
+            common, ancestral, intermediate = subtract_outgroup(common, outgroup_common, intermediate, reference)
         elif outgroup_json:
-            common, ancestral = subtract_outgroup(common, outgroup_common)
+            common, ancestral, intermediate = subtract_outgroup(common, outgroup_common, intermediate, reference)
         logging.debug("Write constellations out to prefix %s" % prefix)
         write_constellation(prefix, group, common, intermediate, ancestral)
 
