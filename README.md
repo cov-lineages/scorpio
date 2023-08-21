@@ -1,24 +1,47 @@
-# scorpio
-serious constellations of reoccurring phylogenetically-independent origin
+# scorpio <img src="https://anaconda.org/bioconda/scorpio/badges/downloads.svg" alt="" align = "right"/>
+(serious constellations of reoccurring phylogenetically-independent origin)
 
-<img src="https://github.com/cov-lineages/scorpio/blob/main/docs/scorpio_logo.png" width="300">
+<img src="https://github.com/cov-lineages/scorpio/blob/main/docs/scorpio_logo.png" width="100">
 
-## Command line options:
+Scorpio provides a set of command line utilities for classifying, haplotyping and defining constellations of mutations for an aligned set of genome sequences. It was developed to enable exploration and classification of variants of concern within the SARS-CoV-2 pandemic and all SARS-CoV-2 specific information can be installed via [constellations](https://github.com/cov-lineages/constellations).
 
-### commands
+## Wiki
+For example commands and FAQ please checkout the [wiki](https://github.com/cov-lineages/scorpio/wiki).
+
+## Installation
+
+You can install scorpio from Bioconda:
+
+`conda install -c bioconda scorpio`
+
+You can also build the contents of this repository locally with:
+
+```
+git clone https://github.com/cov-lineages/scorpio.git
+cd scorpio
+conda env create -f environment.yml
+conda activate scorpio
+pip install .
+```
+
+If you want to check your local installation has been successful, you can install pytest and run the included tests:
+```
+pip install pytest
+pytest .
+```
+Please note that scorpio installation will always clone the most up-to-date version of the constellations repository, and these tests have been designed to pass with these definitions. Running with older constellations versions is likely to cause the tests to fail.
+
+## Commands
+
+Scorpio currently includes the following commands:
 1. `classify` - takes a set of lineage-defining constellations with rules and classifies sequences by them.
 2. `haplotype` - takes a set of constellations and writes haplotypes (either as strings or individual columns).
-3. `report` - creates a report HTML for a constellation
+3. `list` - print the `mrca_lineage` and `output_name` of constellations as a single column to stdout.
 4. `define` - takes a CSV with a group column and a mutations column and extracts the common mutations within the group, optionally with reference to a specified outgroup
 
-### general options
-* `-i`, `--input` - primary input file (usually the FASTA file)
-* `-m`, `--metadata` - the metadata CSV file (required for some commands)
-* `-o`, `--output` - the output file or path
-* `-p`, `--prefix` - the output prefix (when multiple output files are being produced)
-* `-c`, `--constellation` - a file of one or more constellations in JSON format (default to installed file from constellation github?)
-* `-n`, `--names` - a list of constellation names to include from the file
+An overview and example commands for each of these can be found in [the wiki](https://github.com/cov-lineages/scorpio/wiki).
 
+## Constellations
 The JSON file for an individual constellation (in this case a lineage defining one) would look like this:
 ```json
 {
@@ -63,33 +86,4 @@ where `gene` is a gene code (or `nuc` for the genomic nucleotide sequence), `ref
 
 Rules can either specify [min|max]_[ref|alt|ambig|oth] OR the call required at a mutation e.g. "N:S235F": (not )[ref|alt|ambig|oth]
 
-## Valid Mutation Definitions
-The following are valid ways to describe variants of each type. We prefer the definition at the top of each list, but provide alternatives for backwards compatibility. 
-* these are case insensitive e.g. S vs s
-* genes can be full e.g. orf1ab spike, or shortened e.g. 1ab, s
-* protein based definitions may be acceptable if the reference JSON includes them but may not be shortened e.g. NSP2
-* all coordinates are 1-based
-* for amino acid mutations, reference can be longer than 1 amino acid
-
-SNP:
-* nuc:[`ref`]`nucleotide_coordinate`[`alt`]
-* snp:[`ref`]`nucleotide_coordinate`[`alt`]
-
-Amino acid mutation: 
-* `gene`:[`ref`]`amino_acid_coordinate_relative_to_gene`[`alt`]
-* `protein`:[`ref`]`amino_acid_coordinate_relative_to_protein`[`alt`]
-* `gene`:[`ref`]`amino_acid_coordinate_relative_to_gene` - this allows any other aa to be called as alt
-* aa:`gene`:[`ref`]`amino_acid_coordinate_relative_to_gene`[`alt`]
-* aa:`protein`:[`ref`]`amino_acid_coordinate_relative_to_protein`[`alt`]
-* aa:`gene`:[`ref`]`amino_acid_coordinate_relative_to_gene` - this allows any other aa to be called as alt
-
-Deletion: 
-* del:`nucleotide_coordinate`:`nucleotide_length`
-* `gene`:[`ref`]`amino_acid_coordinate`-
-* `gene`:[`ref`]`amino_acid_coordinate`del
-
-Insertion (currently parsed but not typed):
-* nuc:`nucleotide_coordinate`+`inserted_sequence` 
-* snp:`nucleotide_coordinate`+`inserted_sequence` 
-* `gene`:`amino_acid_coordinate_relative_to_gene`+`inserted_sequence` 
-* aa:`gene`:`amino_acid_coordinate_relative_to_gene`+`inserted_sequence`
+More information can be found [about constellations](https://github.com/cov-lineages/scorpio/wiki/What-does-a-valid-constellation-look-like%3F) and [mutation definitions](https://github.com/cov-lineages/scorpio/wiki/What-does-a-valid-mutation-site-look-like%3F) on the wiki.
