@@ -123,9 +123,13 @@ class Variant:
         self.frequency = 1
 
         self.variant_to_variant_record(variant, reference, ignore_fails)
+        self.print()
         self.get_positions(reference)
+        self.print()
         self.check_ref_allele(reference, ignore_fails)
+        self.print()
         self.add_context(reference)
+        self.print()
 
     def print(self):
         print("{", self.name, self.space, self.type, self.ref_start, self.length, self.ref_allele, self.alt_allele, self.cds, self.aa_pos, self.before, self.after, self.fuzzy, "}")
@@ -322,7 +326,6 @@ class Variant:
         elif lsplit[0] in ["snp", "nuc"]:
             self.space = "nuc"
             self.type = "snp"
-            self.length = 1
             m = re.match(r'(?P<ref_allele>[ACGTUN]+)(?P<ref_start>\d+)(?P<alt_allele>[AGCTUN]*)', l[4:])
             if not m:
                 sys.stderr.write("Warning: couldn't parse the following string: %s\n" % l)
@@ -333,6 +336,7 @@ class Variant:
             self.ref_allele = info["ref_allele"]
             self.ref_start = int(info["ref_start"])
             self.alt_allele = info["alt_allele"]
+            self.length = len(self.ref_allele)
 
         elif lsplit[0] == "del":
             self.type = "del"
