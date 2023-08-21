@@ -137,109 +137,160 @@ class Reference:
                 if aa_pos:
                     self.features_dict[feature] = (aa_pos, self.features_dict[feature][1] + self.features_dict[feature][0] - aa_pos, cds)
 
+class Variant:
+    def __init__(self, variant=None, reference=None, ignore_fails=False):
+        self.name = variant
+        self.space = None  # aa, nuc
+        self.type = None  # del, ins, snp
+        self.ref_start = None
+        self.length = None
+        self.ref_allele = ""
+        self.alt_allele = ""
 
-def variant_to_variant_record(l, reference, ignore_fails=False):
-    """
-    convert a variant in one of the following formats
+        self.cds = None
+        self.pos = None
+        self.aa_pos = None
+        self.before = None
+        self.after = None
+        self.fuzzy = False
 
-    snp:T6954C
-    nuc:T6954C
-    del:11288:9
-    aa:orf1ab:T1001I
-    aa:orf1ab:T1001del
-    aa:orf1ab:T1001 # this is for ambiguous AA change, NOT DELETION
+        self.count = 1
+        self.frequency = 1
 
-    to a dict
-    """
-    #print("Parsing variant %s" %l)
-    info = {}
+        self.variant_to_variant_record(variant, reference, ignore_fails)
 
-    if "#" in l:
-        l = l.split("#")[0].strip()
-        if l == "":
-            return info
-    lsplit = l.split(":")
+    def print(self):
+        print("{", self.name, self.space, self.type, self.ref_start, self.length, self.ref_allele, self.alt_allele, self.cds, self.pos, self.aa_pos, self.before, self.after, self.fuzzy, "}")
 
-    if "+" in l:
-        m = re.match(r'[aa:]*(?P<cds>\w+):(?P<pos>\d+)\+(?P<alt_allele>[a-zA-Z]+)', l)
-        if not m:
-            sys.stderr.write("Warning: couldn't parse the following string: %s\n" % l)
-            if not ignore_fails:
-                sys.exit(1)
-        info = m.groupdict()
-        info["type"] = "ins"
-        info["ref_allele"] = ""
-        if info["cds"] not in ["snp", "nuc"]:
-            cds, pos = resolve_ambiguous_cds(info["cds"], info["pos"], reference.features_dict)
-            info["ref_start"] = get_nuc_position_from_aa_description(cds, pos, reference.features_dict)
-            info["name"] = "%s:%s%d+%s" % (info["cds"], info["ref_allele"], info["pos"], info["alt_allele"])
+    def variant_to_variant_record(self, l, reference, ignore_fails):
+        """
+        convert a variant in one of the following formats
+
+        snp:T6954C
+        nuc:T6954C
+        del:11288:9
+        aa:orf1ab:T1001I
+        aa:orf1ab:T1001del
+        aa:orf1ab:T1001 # this is for ambiguous AA change, NOT DELETION
+
+        to a dict
+        """
+        # print("Parsing variant %s" %l)
+
+        if not l:
+            return
+
+        if "#" in l:
+            l = l.split("#")[0].strip()
+            self.name = l
+            if l == "":
+                return
+
+        if not reference:
+            sys.stderr.write("No refererence\n")
+
+        lsplit = l.split(":")
+
+        if "+" in l:
+            m = re.match(r'ins:(?P<pos>\d+)\+(?P<length>\d+)', l)
+            if not m:
+                m = re.match(r'[aa:]*(?P<cds>\w+):(?P<pos>\d+)\+(?P<alt_allele>[a-zA-Z]+)', l)
+            if not m:
+                sys.stderr.write("Warning: couldn't parse the following string: %s\n" % l)
+                if not ignore_fails:
+                    sys.exit(1)
+            info = m.groupdict()
+            self.type = "ins"
+
+            if "cds" in info and info["cds"] not in ["snp", "nuc"]:
+                self.space = "aa"
+                self.cds, self.pos = resolve_ambiguous_cds(info["cds"], info["pos"], reference.features_dict)
+                self.alt_allele = info["alt_allele"]
+                self.ref_start = get_nuc_position_from_aa_description(self.cds, self.pos, reference.features_dict)
+                self.name = "%s:%d+%s" % (self.cds, self.pos, self.alt_allele)
+            else:
+                self.space = "nuc"
+                self.ref_start = int(info["pos"])
+                if "length" in info:
+                    self.length = info["length"]
+            logging.debug("Warning: found variant of type insertion, which will be ignored during typing")
+        elif lsplit[0] in ["snp", "nuc"]:
+            self.space = "nuc"
+            self.type = "snp"
+            self.length = 1
+            m = re.match(r'(?P<ref_allele>[ACGTUN]+)(?P<ref_start>\d+)(?P<alt_allele>[AGCTUN]*)', l[4:])
+            if not m:
+                sys.stderr.write("Warning: couldn't parse the following string: %s\n" % l)
+                if not ignore_fails:
+                    sys.exit(1)
+            info = m.groupdict()
+            self.ref_allele = info["ref_allele"]
+            self.ref_start = int(info["ref_start"])
+            self.alt_allele = info["alt_allele"]
+            ref_allele_check = reference.refseq[self.ref_start - 1]
+
+            if info["ref_allele"] != '?' and info["ref_allele"] != ref_allele_check:
+                print(self.name)
+                self.print()
+                sys.stderr.write(
+                    "variants file says reference nucleotide at position %d is %s, but reference sequence has %s, "
+                    "context %s\n" % (self.ref_start, info["ref_allele"], ref_allele_check,
+                                      reference.refseq[self.ref_start - 4:self.ref_start + 3]))
+                if not ignore_fails:
+                    sys.exit(1)
+
+        elif lsplit[0] == "del":
+            self.type = "del"
+            self.space = "nuc"
+            self.ref_start = int(lsplit[1])
+            self.length = int(lsplit[2])
+            self.ref_allele = reference.refseq[self.ref_start - 1:self.ref_start + self.length - 1]
+
         else:
-            info["ref_start"] = info["pos"]
-            info["name"] = l
-        logging.debug("Warning: found variant of type insertion, which will be ignored during typing")
-    elif lsplit[0] in ["snp", "nuc"]:
-        info = {"name": l, "type": "snp"}
-        m = re.match(r'(?P<ref_allele>[ACGTUN]+)(?P<ref_start>\d+)(?P<alt_allele>[AGCTUN]*)', l[4:])
-        if not m:
-            sys.stderr.write("Warning: couldn't parse the following string: %s\n" % l)
-            if not ignore_fails:
-                sys.exit(1)
-        info.update(m.groupdict())
-        info["ref_start"] = int(info["ref_start"])
-        ref_allele_check = reference.refseq[info["ref_start"] - 1]
+            m = re.match(r'[aa:]*(?P<cds>\w+):(?P<ref_allele>[a-zA-Z-*]+)(?P<aa_pos>\d+)(?P<alt_allele>[a-zA-Z-*]*)', l)
+            if not m:
+                sys.stderr.write("Warning: couldn't parse the following string: %s\n" % l)
+                if not ignore_fails:
+                    sys.exit(1)
+                return
 
-        if info["ref_allele"] != '?' and info["ref_allele"] != ref_allele_check:
-            sys.stderr.write(
-                "variants file says reference nucleotide at position %d is %s, but reference sequence has %s, "
-                "context %s\n" % (info["ref_start"], info["ref_allele"], ref_allele_check, refseq[info["ref_start"] - 4:info["ref_start"] + 3]))
-            if not ignore_fails:
-                sys.exit(1)
+            info = m.groupdict()
+            self.space = "aa"
+            self.ref_allele = info["ref_allele"]
+            info["aa_pos"] = int(info["aa_pos"])
+            self.alt_allele = info["alt_allele"]
+            self.name = "%s:%s%d%s" % (info["cds"], info["ref_allele"], info["aa_pos"], info["alt_allele"])
+            self.type = "aa"
 
-    elif lsplit[0] == "del":
-        length = int(lsplit[2])
-        info = {"name": l, "type": lsplit[0], "ref_start": int(lsplit[1]), "length": length,
-                "ref_allele": reference.refseq[int(lsplit[1]) - 1:int(lsplit[1]) + length - 1], "space": "nuc"}
+            cds, aa_pos = resolve_ambiguous_cds(info["cds"], info["aa_pos"], reference.features_dict)
+            ref_start = get_nuc_position_from_aa_description(cds, aa_pos, reference.features_dict)
 
-    else:
-        m = re.match(r'[aa:]*(?P<cds>\w+):(?P<ref_allele>[a-zA-Z-*]+)(?P<aa_pos>\d+)(?P<alt_allele>[a-zA-Z-*]*)', l)
-        if not m:
-            sys.stderr.write("Warning: couldn't parse the following string: %s\n" % l)
-            if not ignore_fails:
-                sys.exit(1)
-            return info
+            ref_allele = Seq(reference.refseq[ref_start - 1:ref_start - 1 + 3 * len(info["ref_allele"])])
+            ref_allele_check = ref_allele.translate()
+            if info["ref_allele"] != '?' and info["ref_allele"] != ref_allele_check:
+                print(self.name)
+                self.print()
+                sys.stderr.write("variants file says reference amino acid in CDS %s at position %d is %s, but "
+                                 "reference sequence has %s\n" % (cds, aa_pos, info["ref_allele"], ref_allele_check))
+                if not ignore_fails:
+                    sys.exit(1)
 
-        info = m.groupdict()
-        info["aa_pos"] = int(info["aa_pos"])
-        info["name"] = "%s:%s%d%s" % (info["cds"], info["ref_allele"], info["aa_pos"], info["alt_allele"])
-        info["type"] = "aa"
+            self.cds = cds
+            self.aa_pos = aa_pos
+            self.ref_start = ref_start
+            if info["alt_allele"] in ['del', '-']:
+                self.type = "del"
+                self.length = len(self.ref_allele)
+                self.before = str(Seq(reference.refseq[ref_start - 4:ref_start - 1]).translate())
+                self.after = str(Seq(reference.refseq[ref_start - 1 + 3 * self.length:ref_start - 1 + 3 * self.length + 3]).translate())
+            elif info["alt_allele"] == '':
+                self.fuzzy = True
 
-        cds, aa_pos = resolve_ambiguous_cds(info["cds"], info["aa_pos"], reference.features_dict)
-        ref_start = get_nuc_position_from_aa_description(cds, aa_pos, reference.features_dict)
 
-        ref_allele = Seq(reference.refseq[ref_start - 1:ref_start - 1 + 3*len(info["ref_allele"])])
-        ref_allele_check = ref_allele.translate()
-        if info["ref_allele"] != '?' and info["ref_allele"] != ref_allele_check:
-            sys.stderr.write("variants file says reference amino acid in CDS %s at position %d is %s, but "
-                             "reference sequence has %s\n" % (cds, aa_pos, info["ref_allele"], ref_allele_check))
-            if not ignore_fails:
-                sys.exit(1)
+        # print("Found variant %s of type %s" % (info["name"], info["type"]))
+        return
 
-        info["cds"] = cds
-        info["aa_pos"] = aa_pos
-        info["ref_start"] = ref_start
-        if info["alt_allele"] in ['del', '-']:
-            info["type"] = "del"
-            info["space"] = "aa"
-            info["length"] = len(info["ref_allele"])
-            info["before"] = str(Seq(reference.refseq[ref_start - 4:ref_start - 1]).translate())
-            info["after"] = str(Seq(reference.refseq[ref_start - 1 + 3*info["length"]:ref_start - 1 + 3*info["length"]+3]).translate())
-        elif info["alt_allele"] == '':
-            info["fuzzy"] = True
-        else:
-            info["fuzzy"] = False
 
-    #print("Found variant %s of type %s" % (info["name"], info["type"]))
-    return info
 
 
 class Constellation:
@@ -311,13 +362,13 @@ class Constellation:
 
         if "sites" in json_dict:
             for site in json_dict["sites"]:
-                record = variant_to_variant_record(site, reference, ignore_fails=ignore_fails)
-                if record != {}:
+                record = Variant(site, reference, ignore_fails=ignore_fails)
+                if record.name:
                     self.variants.append(record)
         if include_ancestral and "ancestral" in json_dict:
             for site in json_dict["ancestral"]:
-                record = variant_to_variant_record(site, reference, ignore_fails=ignore_fails)
-                if record != {}:
+                record = Variant(site, reference, ignore_fails=ignore_fails)
+                if record.name:
                     self.variants.append(record)
 
         if "rules" in json_dict:
@@ -357,7 +408,7 @@ class Constellation:
                 var = "%s:%s" % (row["gene"], row["id"])
             else:
                 var = row["id"]
-            record = variant_to_variant_record(var, reference, ignore_fails=ignore_fails)
+            record = Variant(var, reference, ignore_fails=ignore_fails)
             if record != {}:
                 self.variants.append(record)
             if "compulsory" in reader.fieldnames and row["compulsory"] in ["True", True, "Y", "y", "Yes", "yes", "YES"]:
@@ -384,7 +435,7 @@ class Constellation:
             for line in f:
                 l = line.split("#")[0].strip()  # remove comments from the line
                 if len(l) > 0:  # skip blank lines (or comment only lines)
-                    record = variant_to_variant_record(l, reference, ignore_fails=ignore_fails)
+                    record = Variant(l, reference, ignore_fails=ignore_fails)
                     if record != {}:
                         self.variants.append(record)
         self.variants = sorted(self.variants, key=lambda x: int(x["ref_start"]))
@@ -422,7 +473,7 @@ class Constellation:
         if len(self.variants) == 0 and not variants_file.endswith(".json"):
             self.parse_textfile_in(reference, variants_file, ignore_fails=ignore_fails)
 
-        self.variants = sorted(self.variants, key=lambda x: int(x["ref_start"]))
+        self.variants = sorted(self.variants, key=lambda x: int(x.ref_start))
 
 
 def parse_mutations_in(mutations_file):
@@ -452,7 +503,7 @@ def parse_mutations(reference, mutations_list, ignore_fails=False):
     problematic = []
 
     for mutation in mutations_list:
-        record = variant_to_variant_record(mutation, reference, ignore_fails=ignore_fails)
+        record = Variant(mutation, reference, ignore_fails=ignore_fails)
         if record != {}:
             variants.append(record)
         else:
@@ -470,54 +521,54 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
     call = None
     query_allele = None
 
-    if var["type"] == "ins":
+    if var.type == "ins":
         call = "oth"
         query_allele = ins_char
-    elif var["type"] == "snp":
-        query_allele = record_seq.upper()[var["ref_start"] - 1]
-        if query_allele == var["ref_allele"]:
+    elif var.type == "snp":
+        query_allele = record_seq.upper()[var.ref_start - 1]
+        if query_allele == var.ref_allele:
             call = 'ref'
         elif query_allele == "N":
             call = 'ambig'
-        elif query_allele == var["alt_allele"] or var["alt_allele"] == "":
+        elif query_allele == var.alt_allele or var.alt_allele == "":
             call = 'alt'
         else:
             call = 'oth'
 
-    elif var["type"] == "aa":
+    elif var.type == "aa":
         try:
-            query = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] - 1 + 3 * len(var["ref_allele"])]
+            query = record_seq.upper()[var.ref_start - 1:var.ref_start - 1 + 3 * len(var.ref_allele)]
             query_allele = query.translate(gap = "-")
-            if query_allele == var["ref_allele"]:
+            if query_allele == var.ref_allele:
                 call = 'ref'
             elif query_allele == "X":
                 call = 'ambig'
-            elif query_allele == var["alt_allele"] or var["fuzzy"]:
+            elif query_allele == var.alt_allele or var.fuzzy:
                 call = 'alt'
             else:
                 call = 'oth'
         except:
             call = 'oth'
 
-    elif var["type"] == "del" and var["space"] == "aa":
-        query_allele = str(record_seq.upper()[var["ref_start"] - 4:var["ref_start"] + 3*var["length"] + 2])
+    elif var.type == "del" and var.space == "aa":
+        query_allele = str(record_seq.upper()[var.ref_start - 4:var.ref_start + 3*var.length + 2])
         query = query_allele.replace("-","")
         if len(query) % 3 != 0:
             query = query.replace("N","")
         if len(query) % 3 != 0:
             query = query_allele.replace("-","N")
         if len(query) % 3 != 0:
-            logging.warning("Warning: while typing variant %s (before,ref,after) = (%s,%s,%s) found sequence with query allele %s treated as %s. Handling by adding Ns which will result in ambiguous calls" %(var["name"], var["before"], var["ref_allele"], var["after"], query_allele, query))
+            logging.warning("Warning: while typing variant %s (before,ref,after) = (%s,%s,%s) found sequence with query allele %s treated as %s. Handling by adding Ns which will result in ambiguous calls" %(var.name, var.before, var.ref_allele, var.after, query_allele, query))
         query_allele = query
         while len(query_allele) % 3 != 0:
             query_allele += "N"
         query_allele = Seq(query_allele).translate()
-        if query_allele == var["before"] + var["ref_allele"] + var["after"]:
+        if query_allele == var.before + var.ref_allele + var.after:
             call = 'ref'
             query_allele = 0
-        elif query_allele == var["before"] + var["after"]:
+        elif query_allele == var.before + var.after:
             call = 'alt'
-            query_allele = var["length"]
+            query_allele = var.length
         elif "X" in query_allele:
             call = 'ambig'
             query_allele = "X"
@@ -525,15 +576,15 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
             call = 'oth'
             if not oth_char:
                 query_allele = "X"
-    elif var["type"] == "del" and var["space"] == "nuc":
-        query_allele = record_seq.upper()[var["ref_start"] - 1:var["ref_start"] + var["length"] - 1]
+    elif var.type == "del" and var.space == "nuc":
+        query_allele = record_seq.upper()[var.ref_start - 1:var.ref_start + var.length - 1]
 
-        if query_allele == var["ref_allele"]:
+        if query_allele == var.ref_allele:
             call = 'ref'
             query_allele = 0
-        elif query_allele == "-" * var["length"] or query_allele == "N" * var["length"]:
+        elif query_allele == "-" * var.length or query_allele == "N" * var.length:
             call = 'alt'
-            query_allele = max(int(var["length"] / 3), 1)
+            query_allele = max(int(var.length / 3), 1)
         elif "N" in query_allele:
             call = 'ambig'
             if not oth_char:
@@ -545,7 +596,7 @@ def call_variant_from_fasta(record_seq, var, ins_char="?", oth_char=None, codon=
             if not oth_char:
                 query_allele = "X"
 
-    if call == "oth" and var["type"] != "ins" and oth_char:
+    if call == "oth" and var.type != "ins" and oth_char:
         query_allele = oth_char
 
     return call, query_allele
@@ -617,13 +668,13 @@ def count_and_classify(record_seq, constellation):
         call, query_allele = call_variant_from_fasta(record_seq, var)
         #print(var, call, query_allele)
         counts[call] += 1
-        if var['type'] in ["aa", "snp"]:
+        if var.type in ["aa", "snp"]:
             counts["substitution"][call] += 1
-        elif var['type'] in ["ins", "del"]:
+        elif var.type in ["ins", "del"]:
             counts["indel"][call] += 1
         for key in constellation.rules:
-            if var["name"] in constellation.rules[key]:
-                if var_follows_rule(call, constellation.rules[key][var["name"]]):
+            if var.name in constellation.rules[key]:
+                if var_follows_rule(call, constellation.rules[key][var.name]):
                     counts['rules'][key] += 1
                 elif is_rule_follower_dict[key]:
                     is_rule_follower_dict[key] = False
@@ -907,7 +958,7 @@ def type_constellations(in_fasta, list_constellation_files, constellation_names,
             if output_counts:
                 columns.append("ref_count,alt_count,ambig_count,other_count,support,conflict")
             if append_genotypes:
-                columns.extend([var["name"] for var in constellation.variants])
+                columns.extend([var.name for var in constellation.variants])
             if combination:
                 columns.append("notes")
             header = "%s\n" % ','.join(columns)

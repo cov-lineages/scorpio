@@ -9,7 +9,7 @@ import logging
 from Bio.Seq import Seq
 from operator import itemgetter
 
-from .type_constellations import Reference
+from .type_constellations import Reference, Constellation, Variant
 
 def parse_args():
     parser = argparse.ArgumentParser(description="""Pick a representative sample for each unique sequence""",
@@ -55,21 +55,35 @@ def parse_outgroups(outgroup_file):
     return outgroup_dict, all_outgroups
 
 
+def load_outgroup_json(outgroup_json, reference):
+    constellation = Constellation(from_file=True, reference=reference, variants_file=outgroup_json, include_ancestral=True)
+
+    return constellation.variants
+
 def get_group_dict(in_variants, group_column, index_column, subset):
     group_dict = {}
     groups = set()
+    group = "new_constellation"
 
     with open(in_variants,"r") as f:
         reader = csv.DictReader(f)
-        if group_column not in reader.fieldnames:
+        if group_column and group_column not in reader.fieldnames:
             logging.warning("Group column %s not found in input file %s" %(group_column, in_variants))
             sys.exit(-1)
+        if not group_column:
+            if "group" in reader.fieldnames:
+                group_column = "group"
+                logging.warning("Using group column %s" % group_column)
+            elif "lineage" in reader.fieldnames:
+                group_column = "lineage"
+                logging.warning("Using group column %s" % group_column)
+            else:
+                logging.warning("No group column specified - assume all one group.")
         if index_column not in reader.fieldnames:
-            logging.warning("Index column %s not found in input file %s" %(index_column, in_variants))
             index_column = reader.fieldnames[0]
-            logging.warning("Using index column %s" % index_column)
+            logging.info("Using index column %s" % index_column)
         for row in reader:
-            if group_column in row and index_column in row:
+            if group_column and group_column in row and index_column in row:
                 if subset and row[group_column] not in subset:
                     logging.info("skip")
                     continue
@@ -78,6 +92,9 @@ def get_group_dict(in_variants, group_column, index_column, subset):
                 else:
                     group_dict[row[index_column]] = row[group_column]
                     groups.add(row[group_column])
+            else:
+                group_dict[row[index_column]] = group
+                groups.add(group)
 
     if len(groups) == 0:
         logging.warning("Found no groups to define")
@@ -86,6 +103,60 @@ def get_group_dict(in_variants, group_column, index_column, subset):
 
     return group_dict
 
+def merge_and_translate_nucs(list_variants, reference, include_protein, skip_translate):
+    merged_list = []
+
+    list_variants.sort(key=itemgetter(1))
+    current = ["", 1, ""]
+    for new in list_variants:
+        # print(new, current)
+        if new[1] == current[1] + len(current[0]):
+            # print("merge")
+            current[0] += new[0]
+            current[2] += new[2]
+
+        elif current[0] != "":
+            var = translate_if_possible(current[1], current[0], current[2], reference, include_protein, skip_translate)
+            merged_list.append(var)
+            current = new
+        else:
+            current = new
+    if current[0] != "":
+        print(current)
+        var = translate_if_possible(current[1], current[0], current[2], reference, include_protein, skip_translate)
+        print(var)
+        merged_list.append(var)
+
+    return merged_list
+
+def parse_row_variants(list_variants, reference, include_protein, skip_translate):
+    merged_list = []
+    if not list_variants:
+        return merged_list
+
+    intermediate_list = []
+    for var in list_variants:
+        if var.startswith("ins") and "_" in var:
+            i, pos, add = var.split("_")
+            var = "%s:%s+%s" % (i, pos, add)
+            merged_list.append(var)
+        elif var.startswith("ins") and ":" in var:
+            i, pos, add = var.split(":")
+            var = "%s:%s+%s" % (i, pos, add)
+            merged_list.append(var)
+        elif var.startswith("del"):
+            var = ':'.join(var.split("_"))
+            merged_list.append(var)
+        else:
+            try:
+                var = var.replace("nuc:","")
+                intermediate_list.append([var[0], int(var[1:-1]), var[-1]])
+            except:
+                print("could not add var %s to intermediate list" % var)
+        merged_list.extend(merge_and_translate_nucs(intermediate_list, reference, include_protein, skip_translate))
+
+    return [Variant(v, reference) for v in merged_list]
+
 
 def update_var_dict(var_dict, group, variants):
     if group not in var_dict:
@@ -93,31 +164,33 @@ def update_var_dict(var_dict, group, variants):
     else:
         var_dict[group]["total"] += 1
 
-    for var in variants.split("|"):
-        if var in var_dict[group]:
-            var_dict[group][var] += 1
+    for var in variants:
+        if var.name in var_dict[group]:
+            var_dict[group][var.name].count += 1
         else:
-            var_dict[group][var] = 1
+            var_dict[group][var.name] = var
     return
 
 
 def get_common_mutations(var_dict, min_occurance=3, threshold_common=0.98, threshold_intermediate=0.25):
-    sorted_tuples = sorted(var_dict.items(), key=operator.itemgetter(1))
+    total = var_dict["total"]
+    del var_dict["total"]
+    sorted_tuples = sorted(var_dict.items(), key=lambda x: x[1].ref_start)
     var_dict = {k: v for k, v in sorted_tuples}
 
     common = []
     intermediate = []
     for var in var_dict:
         #print("var", var, var_dict[var], min_occurance, var_dict["total"])
-        if var != "total" and var_dict[var] == var_dict["total"]:
-            common.append(var)
-        elif var != "total" and var_dict[var] >= min_occurance:
-            frequency = float(var_dict[var])/var_dict["total"]
+        if var_dict[var].count == total:
+            common.append(var_dict[var])
+        elif var_dict[var].count >= min_occurance:
+            var_dict[var].frequency = float(var_dict[var].count)/total
             #print("var", var, var_dict[var], frequency, threshold_common, threshold_intermediate)
-            if frequency > threshold_common:
-                common.append(var)
-            elif frequency > threshold_intermediate:
-                intermediate.append("%s:%f" % (var, frequency))
+            if var_dict[var].frequency >= threshold_common:
+                common.append(var_dict[var])
+            elif var_dict[var].frequency >= threshold_intermediate:
+                intermediate.append(var_dict[var])
     return common, intermediate
 
 
@@ -130,11 +203,11 @@ def translate_if_possible(nuc_start, nuc_ref, nuc_alt, reference, include_protei
     #print(nuc_start, nuc_end, nuc_ref, nuc_alt)
     assert nuc_start > 10
     assert nuc_end > 10
-    #print(nuc_start, nuc_end, reference_seq[nuc_start-1:nuc_end-1], nuc_ref, nuc_alt)
+    #print(nuc_start, nuc_end, refseq[nuc_start-1:nuc_end-1], nuc_ref, nuc_alt)
     assert reference.refseq[nuc_start-1:nuc_end-1] == nuc_ref
     query_seq = reference.refseq[:nuc_start-1] + nuc_alt + reference.refseq[nuc_end-1:]
-    #print(len(reference_seq), len(query_seq), type(int(nuc_start-5)), type(int(nuc_end+5)))
-    #print(reference_seq[nuc_start-5: nuc_end+5])
+    #print(len(refseq), len(query_seq), type(int(nuc_start-5)), type(int(nuc_end+5)))
+    #print(refseq[nuc_start-5: nuc_end+5])
     #print(query_seq[nuc_start-5: nuc_end+5])
 
     for feature in reference.features_dict:
@@ -146,13 +219,13 @@ def translate_if_possible(nuc_start, nuc_ref, nuc_alt, reference, include_protei
                 start -= 1
             while (end - reference.features_dict[feature][0]) % 3 != 0:
                 end += 1
-            ref_allele = Seq(reference.reference_seq[start - 1:end - 1 ]).translate()
+            ref_allele = Seq(reference.refseq[start - 1:end - 1 ]).translate()
             query_allele = Seq(query_seq[start - 1:end - 1]).translate()
             if ref_allele == query_allele:
                 return "nuc:%s%i%s" % (nuc_ref, nuc_start, nuc_alt)
-            aa_pos = int((start - features_dict[feature][0]) / 3) + 1
+            aa_pos = int((start - reference.features_dict[feature][0]) / 3) + 1
             if include_protein:
-                feature, aa_pos = translate_to_protein_if_possible(feature, aa_pos, reference.features_dict)
+                feature, aa_pos = translate_to_protein_if_possible(feature, aa_pos, reference)
             #print(start, end, ref_allele, query_allele, aa_pos, feature)
             return "%s:%s%i%s" % (feature, ref_allele, aa_pos, query_allele)
     return "nuc:%s%i%s" % (nuc_ref, nuc_start, nuc_alt)
@@ -170,95 +243,46 @@ def translate_to_protein_if_possible(cds, aa_start, reference):
                 return feature, aa_start-reference.features_dict[feature][0]+1
     return cds, aa_start
 
-def define_mutations(list_variants, reference, include_protein=False, skip_translate=False):
-    merged_list = []
-    if not list_variants:
-        return merged_list
-
-    intermediate_list = []
-    for variant in list_variants:
-        if ":" in variant:
-            var, freq = variant.split(":")
-        else:
-            var = variant
-            freq = None
-        if var.startswith("del"):
-            new_var = ':'.join(var.split("_"))
-            if freq:
-                merged_list.append("%s:%s" %(new_var, freq))
-            else:
-                merged_list.append(new_var)
-        elif var.startswith("ins") or var.startswith("del"):
-            i, pos, add = var.split("_")
-            new_var = "%s:%s+%s" % (i, pos, add)
-            if freq:
-                merged_list.append("%s:%s" % (new_var, freq))
-            else:
-                merged_list.append(new_var)
-        else:
-            try:
-                intermediate_list.append([var[0], int(var[1:-1]), var[-1], freq])
-            except:
-                print("could not add var %s to intermediate list" %var)
-
-    intermediate_list.sort(key=itemgetter(1))
-    current = ["", 1, "", None]
-    for new in intermediate_list:
-        #print(new, current)
-        if new[1] == current[1] + len(current[0]):
-            #print("merge")
-            current[0] += new[0]
-            current[2] += new[2]
-            if new[3] and current[3]:
-                current[3] = min(current[3], new[3])
-            elif new[3]:
-                current[3] = new[3]
-        elif current[0] != "":
-            var = translate_if_possible(current[1], current[0], current[2], reference, include_protein, skip_translate)
-            if current[3]:
-                merged_list.append("%s:%s" % (var, current[3]))
-            else:
-                merged_list.append(var)
-            current = new
-        else:
-            current = new
-    if current[0] != "":
-        var = translate_if_possible(current[1], current[0], current[2], reference, include_protein, skip_translate)
-        if current[3]:
-            merged_list.append("%s:%s" % (var, current[3]))
-        else:
-            merged_list.append(var)
-    return merged_list
-
 
 def subtract_outgroup(common, outgroup_common):
     updated_common = []
     ancestral = []
     for var in common:
-        if var in outgroup_common:
-            ancestral.append(var)
+        for comp in outgroup_common:
+            if var.name == comp.name:
+                ancestral.append(var)
+            elif var.ref_start == comp.ref_start and var.type == "snp":
+                ancestral.append(var)
         else:
             updated_common.append(var)
     return updated_common, ancestral
 
 
 def write_constellation(prefix, group, list_variants, list_intermediates, list_ancestral):
-    group_dict = {"name": group, "sites": list_variants, "intermediate": list_intermediates,
+    group_dict = {"name": group, "sites": [var.name for var in list_variants], "intermediate": ["%s:%f" %(var.name, var.frequency) for var in list_intermediates],
                   "rules": {"min_alt": max(len(list_variants) - 8, min(len(list_variants), 3)), "max_ref": 3}}
     if list_ancestral:
-        group_dict["ancestral"] = list_ancestral
+        group_dict["ancestral"] = [var.name for var in list_ancestral]
     with open('%s/%s.json' % (prefix, group), 'w') as outfile:
         json.dump(group_dict, outfile, indent=4)
 
 
 def extract_definitions(in_variants, in_groups, group_column, index_column, reference_json, prefix, subset,
-                        threshold_common, threshold_intermediate, outgroup_file, include_protein, skip_translate):
+                        threshold_common, threshold_intermediate, outgroup_file, outgroup_json, include_protein, skip_translate):
+    reference = Reference(reference_json)
+    reference.update_features_dict()
+
     if not in_groups:
         in_groups = in_variants
         logging.debug("Using input file %s for groups" % in_variants)
 
     outgroup_dict, outgroups = parse_outgroups(outgroup_file)
-    logging.debug("Parsed outgroups %s" % outgroups)
+    if outgroup_file:
+        logging.debug("Parsed outgroups %s" % outgroups)
+
+    if outgroup_json:
+        outgroup_common = load_outgroup_json(outgroup_json, reference)
+        logging.debug("Loaded outgroup with %i variants" % len(outgroup_common))
 
     groups_to_get = None
     if subset:
@@ -268,9 +292,6 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
 
     group_dict = get_group_dict(in_groups, group_column, index_column, groups_to_get)
 
-    reference = Reference(reference_json)
-    reference.update_features_dict()
-
     var_dict = {}
     outgroup_var_dict = {}
 
@@ -278,9 +299,8 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
     with open(in_variants, 'r', newline = '') as csv_in:
         reader = csv.DictReader(csv_in, delimiter=",", quotechar='\"', dialect = "unix")
         if index_column not in reader.fieldnames:
-            logging.warning("Index column %s not found in %s" % (index_column, in_variants))
             index_column = reader.fieldnames[0]
-            logging.warning("Using index column %s" % index_column)
+            logging.info("Using index column %s" % index_column)
 
         if "nucleotide_variants" in reader.fieldnames:
             var_column = "nucleotide_variants"
@@ -295,7 +315,7 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
         for row in reader:
             if index_column in row and var_column in row:
                 index = row[index_column]
-                variants = row[var_column]
+                variants = parse_row_variants(row[var_column].split("|"), reference, include_protein, skip_translate)
                 if index in group_dict:
                     group = group_dict[index]
                     if subset is None or group in subset:
@@ -319,12 +339,10 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
         if group in outgroup_var_dict:
             outgroup_common, outgroup_intermediate = get_common_mutations(outgroup_var_dict[group], min_occurance=1, threshold_common=threshold_common, threshold_intermediate=threshold_intermediate)
             common, ancestral = subtract_outgroup(common, outgroup_common)
-        logging.debug("Niceify results")
-        nice_common = define_mutations(common, reference, include_protein, skip_translate)
-        nice_intermediate = define_mutations(intermediate, reference, include_protein, skip_translate)
-        nice_ancestral = define_mutations(ancestral, reference, include_protein, skip_translate)
+        elif outgroup_json:
+            common, ancestral = subtract_outgroup(common, outgroup_common)
         logging.debug("Write constellations out to prefix %s" % prefix)
-        write_constellation(prefix, group, nice_common, nice_intermediate, nice_ancestral)
+        write_constellation(prefix, group, common, intermediate, ancestral)
 
 
 def main():
