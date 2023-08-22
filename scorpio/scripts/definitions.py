@@ -123,13 +123,9 @@ class Variant:
         self.frequency = 1
 
         self.variant_to_variant_record(variant, reference, ignore_fails)
-        self.print()
         self.get_positions(reference)
-        self.print()
         self.check_ref_allele(reference, ignore_fails)
-        self.print()
         self.add_context(reference)
-        self.print()
 
     def print(self):
         print("{", self.name, self.space, self.type, self.ref_start, self.length, self.ref_allele, self.alt_allele, self.cds, self.aa_pos, self.before, self.after, self.fuzzy, "}")

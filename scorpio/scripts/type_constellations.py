@@ -295,7 +295,7 @@ def load_constellations(list_constellation_files, constellation_names, reference
                 continue
             logging.info("\n")
             logging.info("Found file %s for constellation %s containing %i defining mutations" % (
-                constellation_file, constellation, len([v.name for v in constellation.variants])))
+                constellation_file, constellation.name, len([v.name for v in constellation.variants])))
             if rules_required:
                 logging.info("Rules %s" % constellation.rules)
         else:
@@ -391,42 +391,44 @@ def type_record(record, reference, constellation_names, constellation_dict, cons
     write_extended_files = output_counts or append_genotypes
     single_file = len(constellation_names) == 1
 
+    for constellation_name in constellation_names:
+        for constellation in constellation_dict.values():
+            if constellation.output_name != constellation_name:
+                continue
+            else:
+                logging.debug("Consider constellation %s" % constellation.name)
+                barcode_list, counts, sample_constellation_count_dict, sorted_alt_sites = generate_barcode(record.seq,
+                                                                                                           constellation.variants,
+                                                                                                           ref_char,
+                                                                                                           constellation_count_dict=copy.deepcopy(constellation_count_dict))
+                if write_extended_files:
+                    columns = [record.id]
+                    columns.append(''.join(barcode_list))
+                    if output_counts:
+                        columns.append("%i,%i,%i,%i,%f,%f" % (counts['ref'], counts['alt'],
+                                                              counts['ambig'], counts['oth'], counts['support'],
+                                                              counts['conflict']))
+                    if append_genotypes:
+                        columns.extend(barcode_list)
+                    if combination:
+                        scores = {}
+                        for candidate in sample_constellation_count_dict:
+                            if sample_constellation_count_dict[candidate]["alt"] > 0:
+                                summary = "%s:%i|%i|%i|%i" % (
+                                    candidate, sample_constellation_count_dict[candidate]["ref"],
+                                    sample_constellation_count_dict[candidate]["alt"],
+                                    sample_constellation_count_dict[candidate]["ambig"],
+                                    sample_constellation_count_dict[candidate]["oth"])
+                                score = float(sample_constellation_count_dict[candidate]["alt"]) / \
+                                        sample_constellation_count_dict[candidate]["total"]
+                                scores[score] = summary
+                        sorted_scores = sorted(scores, key=lambda x: float(x), reverse=True)
+                        columns.append("; ".join([scores[score] for score in sorted_scores]))
+                    res = "%s\n" % ','.join(columns)
+                    q.put((constellation.output_name, res))
 
-    for constellation in constellation_dict.values():
-        if constellation.output_name not in constellation_names:
-            continue
-        logging.debug("Consider constellation %s" % constellation.name)
-        barcode_list, counts, sample_constellation_count_dict, sorted_alt_sites = generate_barcode(record.seq,
-                                                                                                   constellation.variants,
-                                                                                                   ref_char,
-                                                                                                   constellation_count_dict=copy.deepcopy(constellation_count_dict))
-        if write_extended_files:
-            columns = [record.id]
-            columns.append(''.join(barcode_list))
-            if output_counts:
-                columns.append("%i,%i,%i,%i,%f,%f" % (counts['ref'], counts['alt'],
-                                                      counts['ambig'], counts['oth'], counts['support'],
-                                                      counts['conflict']))
-            if append_genotypes:
-                columns.extend(barcode_list)
-            if combination:
-                scores = {}
-                for candidate in sample_constellation_count_dict:
-                    if sample_constellation_count_dict[candidate]["alt"] > 0:
-                        summary = "%s:%i|%i|%i|%i" % (
-                            candidate, sample_constellation_count_dict[candidate]["ref"],
-                            sample_constellation_count_dict[candidate]["alt"],
-                            sample_constellation_count_dict[candidate]["ambig"],
-                            sample_constellation_count_dict[candidate]["oth"])
-                        score = float(sample_constellation_count_dict[candidate]["alt"]) / \
-                                sample_constellation_count_dict[candidate]["total"]
-                        scores[score] = summary
-                sorted_scores = sorted(scores, key=lambda x: float(x), reverse=True)
-                columns.append("; ".join([scores[score] for score in sorted_scores]))
-            res = "%s\n" % ','.join(columns)
-            q.put((constellation.output_name, res))
-
-        out_list.append(''.join(barcode_list))
+                out_list.append(''.join(barcode_list))
+                break
 
     res = "%s\n" % ",".join(out_list)
     if len(constellation_names) > 1 or not write_extended_files:
