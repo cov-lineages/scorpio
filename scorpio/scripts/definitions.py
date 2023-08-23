@@ -128,7 +128,7 @@ class Variant:
         self.add_context(reference)
 
     def print(self):
-        print("{", self.name, self.space, self.type, self.ref_start, self.length, self.ref_allele, self.alt_allele, self.cds, self.aa_pos, self.before, self.after, self.fuzzy, "}")
+        print("{", self.name, self.space, self.type, self.ref_start, self.length, self.ref_allele, self.alt_allele, self.cds, self.aa_pos, self.before, self.after, self.fuzzy, self.count, self.frequency, "}")
 
     def equals(self, other, reference):
         if self.ref_start == other.ref_start or self.aa_pos == other.aa_pos:

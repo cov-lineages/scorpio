@@ -152,7 +152,8 @@ def parse_row_variants(list_variants, reference, include_protein, skip_translate
                 intermediate_list.append([var[0], int(var[1:-1]), var[-1]])
             except:
                 print("could not add var %s to intermediate list" % var)
-        merged_list.extend(merge_and_translate_nucs(intermediate_list, reference, include_protein, skip_translate))
+    merged_list.extend(merge_and_translate_nucs(intermediate_list, reference, include_protein, skip_translate))
+    assert len(merged_list) <= len(list_variants)
 
     return [Variant(v, reference) for v in merged_list]
 
@@ -180,7 +181,7 @@ def get_common_mutations(var_dict, min_occurance=3, threshold_common=0.98, thres
     common = []
     intermediate = []
     for var in var_dict:
-        #print("var", var, var_dict[var], min_occurance, var_dict["total"])
+        #print("var", var, var_dict[var], min_occurance, total)
         if var_dict[var].count == total:
             common.append(var_dict[var])
         elif var_dict[var].count >= min_occurance:
@@ -327,6 +328,8 @@ def extract_definitions(in_variants, in_groups, group_column, index_column, refe
             if index_column in row and var_column in row:
                 index = row[index_column]
                 variants = parse_row_variants(row[var_column].split("|"), reference, include_protein, skip_translate)
+                assert len(variants) <= len(row[var_column].split("|"))
+                #print(index, (index in group_dict), (index in outgroup_dict), (subset is None or group in subset), (index in group_dict and group_dict[index] in outgroup_dict))
                 if index in group_dict:
                     group = group_dict[index]
                     if subset is None or group in subset:
