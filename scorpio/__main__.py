@@ -134,7 +134,7 @@ def main(sysargs = sys.argv[1:]):
         '--in-groups', dest='in_groups', required=False,
         help='CSV of containing sequence_name and a column defining groups ')
     subparser_define.add_argument(
-        '--group-column', dest='group_column', required=False, default='lineage',
+        '--group-column', dest='group_column', required=False, default=None,
         help='Column name defining the groups')
     subparser_define.add_argument(
         '--index-column', dest='index_column', required=False, default='sequence_name',
@@ -142,13 +142,16 @@ def main(sysargs = sys.argv[1:]):
     subparser_define.add_argument("--subset", dest="subset", required=False, nargs='+',
                                      help="Names of a subset of groups to define")
     subparser_define.add_argument("--threshold-common", dest="threshold_common", required=False, type=float,
-                                  default=0.98, help="Frequency of a variant within group to be considered common")
+                                  default=0.8, help="Frequency of a variant within group to be considered common")
     subparser_define.add_argument("--threshold-intermediate", dest="threshold_intermediate", required=False, type=float,
                                   default=0.25, help="Frequency of a variant within group to be reported as intermediate")
     subparser_define.add_argument(
         '--outgroups', dest='outgroups', required=False,
         help='Two column CSV with group, and pipe separated list of outgroup sequence_names for that list. '
              'Assumes outgroups will be in main input CSV')
+    subparser_define.add_argument(
+        '--outgroup-json', dest='outgroup_json', required=False,
+        help='A single JSON constellation file defining an outgroup for all sequences')
     subparser_define.add_argument(
         "--protein", dest="protein", action="store_true",
         help="Translates definition coordinates to proteins where possible"
@@ -248,6 +251,11 @@ def main(sysargs = sys.argv[1:]):
             for c in args.constellations:
                 logging.info(c)
             logging.info("\n")
+        elif not args.constellations and args.command in ['define'] and args.outgroup_json and not args.outgroup_json.endswith(".json"):
+            for c in list_constellation_files:
+                if args.outgroup_json in c:
+                    logging.info("Using constellation file %s for outgroup %s" %(c,args.outgroup_json))
+                    args.outgroup_json = c
 
     if "call_all" in args and args.call_all and args.long and args.verbose:
         logging.info("Cannot provide long format summary file with multiple calls, ignoring --long\n")

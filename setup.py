@@ -10,7 +10,8 @@ setup(name='scorpio',
       version=__version__,
       packages=find_packages(),
       scripts=["scorpio/scripts/type_constellations.py",
-               "scorpio/scripts/extract_definitions.py"],
+               "scorpio/scripts/extract_definitions.py",
+               "scorpio/scripts/definitions.py"],
       install_requires=[
             "biopython>=1.70"
         ],

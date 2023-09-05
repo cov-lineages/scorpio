@@ -14,5 +14,6 @@ def run(options):
                         options.threshold_common,
                         options.threshold_intermediate,
                         options.outgroups,
+                        options.outgroup_json,
                         options.protein,
                         options.nucleotide)
